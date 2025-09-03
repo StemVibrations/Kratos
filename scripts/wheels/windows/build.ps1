@@ -1,22 +1,22 @@
 param([System.String]$cotire="OFF")
 
-$pythons = "38", "39", "310", "311", "312", "313"
+$pythons = "312"
 $env:kratos_version = "10.3.0"
 
-$kratosRoot = "c:\kratos\kratos"
+$kratosRoot = "."
 $env:kratos_root = $kratosRoot
-$wheelRoot = "c:\wheel"
-$wheelOutDir = "c:\data_swap_guest"
+$wheelRoot = ".\wheel"
+$wheelOutDir = ".\data_swap_guest"
 
 $numcores = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 
 function exec_build($python, $pythonPath) {
-    cmd.exe /c "call configure.bat $($pythonPath) $($kratosRoot) OFF"
+    cmd.exe /c "call configure_wheel.bat $($pythonPath) $($kratosRoot) OFF"
     cmake --build "$($kratosRoot)/build/Release" --target install -- /property:configuration=Release /p:Platform=x64
 }
 
 function exec_build_cotire($python, $pythonPath) {
-    cmd.exe /c "call configure.bat $($pythonPath) $($kratosRoot) ON"
+    cmd.exe /c "call configure_wheel.bat $($pythonPath) $($kratosRoot) ON"
     cmake --build "$($kratosRoot)/build/Release" --target install -- /property:configuration=Release /p:Platform=x64
 }
 
@@ -61,7 +61,7 @@ function build_core ($pythonLocation, $prefixLocation) {
     Write-Host $kratosRoot
     Write-Host "$($kratosRoot)\scripts\wheels\windows\configure.bat"
 
-    cp "$($kratosRoot)\scripts\wheels\windows\configure.bat" .\configure.bat
+    cp "$($kratosRoot)\scripts\wheels\windows\configure.bat" .\configure_wheel.bat
 
     Write-Host "Debugging: begin cmd.exe call"
     
@@ -72,9 +72,9 @@ function build_core ($pythonLocation, $prefixLocation) {
 function build_interface ($pythonLocation, $pythonPath) {
     cd $kratosRoot
 
-    cp "$($kratosRoot)\scripts\wheels\windows\configure.bat" .\configure.bat
+    cp "$($kratosRoot)\scripts\wheels\windows\configure.bat" .\configure_wheel.bat
 
-    cmd.exe /c "call configure.bat $($pythonLocation) $($kratosRoot) $($prefixLocation) $($numcores)"
+    cmd.exe /c "call configure_wheel.bat $($pythonLocation) $($kratosRoot) $($prefixLocation) $($numcores)"
     cmake --build "$($kratosRoot)/build/Release" --target KratosPythonInterface -- /property:configuration=Release /p:Platform=x64 /p:CL_MPCount=24 /m:1
     cmake --build "$($kratosRoot)/build/Release" --target install -- /property:configuration=Release /p:Platform=x64 /p:CL_MPCount=24 /m:1
 }
