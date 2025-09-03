@@ -1,4 +1,5 @@
 @echo off
+call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64 || goto :error
 
 set CC=cl.exe
 set CXX=cl.exe
@@ -25,7 +26,10 @@ del /F /Q "%KRATOS_BUILD%\%KRATOS_BUILD_TYPE%\CMakeFiles"
 echo %KRATOS_SOURCE%
 echo %KRATOS_BUILD%\%KRATOS_BUILD_TYPE%
 
-cmake -G"Visual Studio 16 2019" -H"%KRATOS_SOURCE%" -B"%KRATOS_BUILD%\%KRATOS_BUILD_TYPE%"  ^
+cmake
+-G"Visual Studio 17 2022"                           ^
+-H"%KRATOS_SOURCE%" ^
+-B"%KRATOS_BUILD%\%KRATOS_BUILD_TYPE%"  ^
 -DCMAKE_INSTALL_PREFIX=%3                                                                   ^
 -DCMAKE_POLICY_VERSION_MINIMUM=3.5                                                          ^
 -DUSE_TRIANGLE_NONFREE_TPL=ON                                                               ^
@@ -33,8 +37,6 @@ cmake -G"Visual Studio 16 2019" -H"%KRATOS_SOURCE%" -B"%KRATOS_BUILD%\%KRATOS_BU
 -DCMAKE_CXX_FLAGS="/MP24 /Gm- /Zm10"                                                        ^
 -DBOOST_ROOT=%BOOST_ROOT%                                                                   ^
 -DKRATOS_BUILD_TESTING=OFF                                                                  ^
--DHDF5_ROOT="c:\hdf5\bin"                                                                   ^
--DMED_ROOT="c:\med\bin"                                                                     ^
 -DKRATOS_GENERATE_PYTHON_STUBS=ON
 
 :add_app
