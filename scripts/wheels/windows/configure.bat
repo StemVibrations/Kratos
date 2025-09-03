@@ -35,7 +35,7 @@ cmake                                               ^
   -DUSE_TRIANGLE_NONFREE_TPL=ON                     ^
   -DCMAKE_C_FLAGS="/MP24 /Gm- /Zm10"                ^
   -DCMAKE_CXX_FLAGS="/MP24 /Gm- /Zm10"              ^
-  -DBOOST_ROOT=%BOOST_ROOT%                         ^
+  -DBOOST_ROOT="%TEMP%\boost"                       ^
   -DKRATOS_BUILD_TESTING=OFF                        ^
   -DKRATOS_GENERATE_PYTHON_STUBS=ON
 
