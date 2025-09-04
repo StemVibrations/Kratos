@@ -108,7 +108,7 @@ foreach ($python in $pythons){
     
     Write-Host "Building App Wheels"
     foreach($app in $applications) {
-        build_application_wheel $pythonLocation $app
+        build_application_wheel $pythonLocation $app.Name
     }
 
     Write-Host "Finished wheel construction for python $($python)"
