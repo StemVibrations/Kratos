@@ -40,7 +40,7 @@ jobs:
       matrix:
         build-type: [Release]
         compiler: [gcc]
-        python-version: ["3.12"]
+        # python-version: ["3.12"]
     env:
       KRATOS_BUILD_TYPE: ${{ matrix.build-type }}
       KRATOS_CI_CHANGED_FILES: ${{needs.changed-files.outputs.files}}
@@ -56,10 +56,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+    # - name: Set up Python ${{ matrix.python-version }}
+    #   uses: actions/setup-python@v5
+    #   with:
+    #     python-version: ${{ matrix.python-version }}
 
     # - name: Installing dependencies
     # => must be added to the docker container to avoid reinstalling it in every CI run
