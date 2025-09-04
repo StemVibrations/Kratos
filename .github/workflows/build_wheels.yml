@@ -77,5 +77,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: kratos-wheels-windows
-        path: ./data_swap_guest/
+        path: "${{ github.workspace }}/data_swap_guest"
 
