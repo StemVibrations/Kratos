@@ -91,7 +91,9 @@ foreach ($python in $pythons){
     $env:python = $python
 
     cd $kratosRoot
-    git clean -ffxd
+#     git clean -ffxd
+#     mkdir "$($wheelOutDir)"
+
 
     $pythonLocation = (Get-Command python).Source
 #     $pythonLocation = "$($env:pythonRoot)\$($python)\python.exe"
