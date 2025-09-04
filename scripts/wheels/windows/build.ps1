@@ -6,7 +6,8 @@ $env:kratos_version = "10.3.0"
 $kratosRoot = Resolve-Path "."
 $env:kratos_root = $kratosRoot
 $wheelRoot = Join-Path $kratosRoot "wheel"
-$wheelOutDir = Join-Path $kratosRoot "data_swap_guest"
+$wheelOutDir = Join-Path $env:GITHUB_WORKSPACE "data_swap_guest"
+mkdir "$($wheelOutDir)"
 
 $numcores = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 
