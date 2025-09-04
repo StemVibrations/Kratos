@@ -3,10 +3,10 @@ param([System.String]$cotire="OFF")
 $pythons = "312"
 $env:kratos_version = "10.3.0"
 
-$kratosRoot = "."
+$kratosRoot = Resolve-Path "."
 $env:kratos_root = $kratosRoot
-$wheelRoot = ".\wheel"
-$wheelOutDir = ".\data_swap_guest"
+$wheelRoot = Join-Path $kratosRoot "wheel"
+$wheelOutDir = Join-Path $kratosRoot "data_swap_guest"
 
 $numcores = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 
