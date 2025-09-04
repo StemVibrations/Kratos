@@ -74,8 +74,8 @@ jobs:
         & "${{ github.workspace }}\scripts\wheels\windows\build.ps1"
 
     - name: Upload Kratos wheels
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: kratos-wheels-windows
-        path: data_swap_guest/
+        path: ./data_swap_guest/
 
