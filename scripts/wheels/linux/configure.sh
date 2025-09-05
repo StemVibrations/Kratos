@@ -6,8 +6,8 @@ add_app () {
 }
 
 # Set compiler
-export CC=gcc
-export CXX=g++
+export CC=gcc-12
+export CXX=g++-12
 
 # Set variables
 export KRATOS_SOURCE=${KRATOS_ROOT}
@@ -31,19 +31,21 @@ rm -rf "${KRATOS_BUILD}/${KRATOS_BUILD_TYPE}/cmake_install.cmake"
 rm -rf "${KRATOS_BUILD}/${KRATOS_BUILD_TYPE}/CMakeCache.txt"
 rm -rf "${KRATOS_BUILD}/${KRATOS_BUILD_TYPE}/CMakeFiles"
 
-cmake -H"${KRATOS_SOURCE}" -B"${KRATOS_BUILD}/${KRATOS_BUILD_TYPE}"    \
--DCMAKE_POLICY_VERSION_MINIMUM=3.5                                     \
--DCMAKE_INSTALL_PREFIX=$2                                              \
--DUSE_TRIANGLE_NONFREE_TPL=ON                                          \
--DUSE_MPI=OFF                                                          \
--DCMAKE_C_COMPILER=/opt/rh/devtoolset-10/root/usr/bin/gcc               \
--DCMAKE_CXX_COMPILER=/opt/rh/devtoolset-10/root/usr/bin/g++             \
--DCMAKE_CXX_FLAGS="-msse3 -std=c++11 "                                 \
--DCMAKE_C_FLAGS="-msse3"                                               \
--DBOOST_ROOT="/workspace/boost/boost_1_87_0"                           \
--DLAPACK_LIBRARIES="/usr/lib64/liblapack.so.3"                         \
--DBLAS_LIBRARIES="/usr/lib64/libblas.so.3"                             \
--DINCLUDE_MMG=ON                                                       \
--DMMG_ROOT="/workspace/external_libraries/mmg/mmg_5_5_1"               \
--DKRATOS_BUILD_TESTING=OFF                                             \
--DKRATOS_GENERATE_PYTHON_STUBS=ON                                      \
+cmake -H"${KRATOS_SOURCE}" -B"${KRATOS_BUILD}/${KRATOS_BUILD_TYPE}"                  \
+-DCMAKE_POLICY_VERSION_MINIMUM=3.5                                                   \
+-DCMAKE_INSTALL_PREFIX=$2                                                            \
+-DUSE_TRIANGLE_NONFREE_TPL=ON                                                        \
+-DUSE_MPI=OFF                                                                        \
+-DCMAKE_C_COMPILER=/usr/bin/gcc                                                      \
+-DCMAKE_CXX_COMPILER=/usr/bin/g++                                                    \
+-DCMAKE_CXX_STANDARD=17                                                              \
+-DCMAKE_CXX_STANDARD_REQUIRED=ON                                                     \
+-DCMAKE_CXX_FLAGS="-msse3 -Werror -Wno-deprecated-declarations -Wignored-qualifiers" \
+-DCMAKE_C_FLAGS="-msse3"                                                             \
+-DBOOST_ROOT="/boost/boost_1_74_0"                                                   \
+-DLAPACK_LIBRARIES="/usr/lib64/liblapack.so.3"                                       \
+-DBLAS_LIBRARIES="/usr/lib64/libblas.so.3"                                           \
+-DINCLUDE_MMG=ON                                                                     \
+-DMMG_ROOT="/external_libraries/mmg/mmg_5_8_0"                                       \
+-DKRATOS_BUILD_TESTING=OFF                                                           \
+-DKRATOS_GENERATE_PYTHON_STUBS=ON                                                    \

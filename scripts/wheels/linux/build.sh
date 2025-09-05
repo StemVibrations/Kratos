@@ -1,13 +1,12 @@
 #!/bin/bash
-PYTHONS=("311")
-export KRATOS_VERSION="10.3.0"
+PYTHONS=("3.11")
+export KRATOS_VERSION="10.2.3"
 
 BASE_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
-export KRATOS_ROOT="."
-WHEEL_ROOT="./wheel"
-WHEEL_OUT="./data_swap_guest"
-mkdir $WHEEL_OUT
-CORE_LIB_DIR="./coreLibs"
+export KRATOS_ROOT="$(pwd)"
+WHEEL_ROOT="$KRATOS_ROOT/wheel"
+WHEEL_OUT="$KRATOS_ROOT/data_swap_guest"
+CORE_LIB_DIR="$KRATOS_ROOT/coreLibs"
 
 # Created the wheel building directory.
 setup_wheel_dir () {
@@ -116,12 +115,10 @@ optimize_wheel(){
 
 # Buils the KratosXCore components for the kernel and applications
 build_core () {
-	cd $KRATOS_ROOT
-
-	PYTHON_LOCATION=$1
+    PYTHON_LOCATION=$1
     PREFIX_LOCATION=$2
 
-	cp ./scripts/wheels/linux/configure.sh ./configure.sh
+	cp $KRATOS_ROOT/scripts/wheels/linux/configure.sh ./configure.sh
 	chmod +x configure.sh
 	./configure.sh $PYTHON_LOCATION $PREFIX_LOCATION
 
@@ -130,12 +127,11 @@ build_core () {
 
 # Buils the KratosXInterface components for the kernel and applications given an specific version of python
 build_interface () {
-    cd $KRATOS_ROOT
 
-	PYTHON_LOCATION=$1
+    PYTHON_LOCATION=$1
     PREFIX_LOCATION=$2
 
-	cp ./scripts/wheels/linux/configure.sh ./configure.sh
+	cp $KRATOS_ROOT/scripts/wheels/linux/configure.sh ./configure.sh
 	chmod +x configure.sh
 	./configure.sh $PYTHON_LOCATION $PREFIX_LOCATION
 
@@ -146,18 +142,16 @@ build_interface () {
 # Core can be build independently of the python version.
 # Install path should be useless here.
 echo "Starting core build"
-build_core python3.8 ${KRATOS_ROOT}/bin/core
+build_core python3.11 ${KRATOS_ROOT}/bin/core
 echo "Finished core build"
 
 for PYTHON_VERSION in  "${PYTHONS[@]}"
 do
-    PYTHON_TMP=$(ls /opt/python | grep $PYTHON_VERSION | cut -d "-" -f 2)
-    export PYTHON=${PYTHON_TMP#cp}
-    echo "Starting build for python${PYTHON_VERSION}"
 
-    PYTHON_LOCATION= $(which python)
-#	PYTHON_LOCATION=/opt/python/$(ls /opt/python | grep $PYTHON_VERSION)/bin/python
-    PREFIX_LOCATION=$KRATOS_ROOT/bin/Release/python_$PYTHON
+    PYTHON_LOCATION=$(which python$PYTHON_VERSION)
+
+    echo "Starting build for python${PYTHON_VERSION}"
+    PREFIX_LOCATION="$KRATOS_ROOT/bin/Release/python_$PYTHON_VERSION"
 
     $PYTHON_LOCATION -m pip install mypy
 
@@ -187,4 +181,3 @@ do
 	export LD_LIBRARY_PATH=$BASE_LD_LIBRARY_PATH
 
 done
-
