@@ -1,9 +1,5 @@
 # import Kratos
 
-import sys
-sys.path.append(r"C:\software_development\KratosFork\bin\Release")
-sys.path.append(r"C:\software_development\KratosFork\bin\Release\libs")
-
 from KratosMultiphysics import *
 from KratosMultiphysics.RailwayApplication import *
 

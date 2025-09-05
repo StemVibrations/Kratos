@@ -1,10 +1,5 @@
 import os
 import shutil
-from pathlib import Path
-
-import sys
-sys.path.append(r"C:\software_development\KratosFork\bin\Release")
-sys.path.append(r"C:\software_development\KratosFork\bin\Release\libs")
 
 import KratosMultiphysics as Kratos
 import KratosMultiphysics.RailwayApplication.geomechanics_analysis as analysis
