@@ -3,7 +3,7 @@ import json
 # Importing the Kratos Library
 import KratosMultiphysics
 import KratosMultiphysics.StructuralMechanicsApplication as KSM
-from KratosMultiphysics.StemApplication.set_moving_load_process import StemSetMovingLoadProcess
+from KratosMultiphysics.RailwayApplication.set_moving_load_process import StemSetMovingLoadProcess
 
 # condition name mapper, the key is the dimension and the number of nodes of the condition,
 # the value is the name of the condition

@@ -3,7 +3,7 @@ import os
 
 import KratosMultiphysics as Kratos
 from KratosMultiphysics.GeoMechanicsApplication import *
-import KratosMultiphysics.StemApplication.geomechanics_analysis as analysis
+import KratosMultiphysics.RailwayApplication.geomechanics_analysis as analysis
 
 def run_stages(project_path,n_stages):
     """

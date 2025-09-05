@@ -3,7 +3,7 @@ from typing import Union
 import KratosMultiphysics as Kratos
 from KratosMultiphysics.GeoMechanicsApplication import (GeoMechanicsNewtonRaphsonStrategy,
                                                         GeoMechanicNewtonRaphsonStrategyLinearElasticDynamic)
-from KratosMultiphysics.StemApplication.uvec_controller import StemUvecController
+from KratosMultiphysics.RailwayApplication.uvec_controller import StemUvecController
 
 
 class StemGeoMechanicsNewtonRaphsonLinearElasticStrategyUvec(GeoMechanicNewtonRaphsonStrategyLinearElasticDynamic):
