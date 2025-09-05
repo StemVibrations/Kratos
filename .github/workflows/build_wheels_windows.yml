@@ -62,6 +62,7 @@ jobs:
         pip install h5py
         pip install parameterized
         pip install setuptools
+        pip install orjson==3.11.0
 
     - name: Build wheels
       shell: pwsh
