@@ -127,21 +127,17 @@ def solve_uvec_solution_step(instance: Union[StemGeoMechanicsNewtonRaphsonLinear
         - bool: True if the solution converged, False otherwise
 
     """
-    print("Info: Stem SolverSolutionStep")
-
     # update dt in uvec json string
     instance.uvec_controller.initialise_solution_step(instance.uvec_data)
 
     for iter_no in range(instance.max_iters):
 
-        print("Info: Stem Non_Linear Iteration: ", iter_no + 1)
+        print("Info: Uvec Non_Linear Iteration: ", iter_no + 1)
 
         # update UVEC json string from Kratos
-        print("Info: Updating UVEC json string from Kratos")
         instance.uvec_controller.update_uvec_from_kratos(instance.uvec_data)
 
         # call UVEC dll and update kratos data
-        print("Info: Executing UVEC and updating Kratos with result")
         instance.uvec_data = instance.uvec_controller.execute_uvec_update_kratos(instance.uvec_data)
 
         # call Kratos solver

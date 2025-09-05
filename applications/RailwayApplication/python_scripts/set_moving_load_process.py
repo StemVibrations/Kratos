@@ -1,6 +1,8 @@
 import KratosMultiphysics
 import KratosMultiphysics.StructuralMechanicsApplication as KSM
 
+import KratosMultiphysics.RailwayApplication as KratosRail
+
 class StemSetMovingLoadProcess(KSM.SetMovingLoadProcess):
     """
     This process sets the moving load condition.
@@ -81,11 +83,7 @@ class StemSetMovingLoadProcess(KSM.SetMovingLoadProcess):
         # managed
         if self.__is_externally_managed:
             precision = 1e-12
-            for condition in self.model_part.Conditions:
-                # update the of load to the value of the model part if the load is not zero.
-                # a zero check is done to find the current location of the moving load
-                if not all(abs(load_magnitude) < precision for load_magnitude in condition.GetValue(KSM.POINT_LOAD)):
-                    condition.SetValue(KSM.POINT_LOAD, self.model_part.GetValue(KSM.POINT_LOAD))
+            KratosRail.UvecUtilities.SetLoadOnCondition(self.model_part, KSM.POINT_LOAD, precision)
 
     def ExecuteFinalize(self):
         """

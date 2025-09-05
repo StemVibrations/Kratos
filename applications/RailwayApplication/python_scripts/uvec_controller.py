@@ -6,6 +6,7 @@ import importlib.util
 
 import KratosMultiphysics
 import KratosMultiphysics.StructuralMechanicsApplication as KSM
+import KratosMultiphysics.RailwayApplication as KratosRail
 
 
 class StemUvecController:
@@ -86,18 +87,9 @@ class StemUvecController:
             axle.SetValue(KSM.POINT_LOAD, uvec_json["loads"][axle_number].GetVector())
 
             # transfer load from model part to conditions
-            self.__transfer_load_from_model_part_to_conditions(axle)
+            KratosRail.UvecUtilities.SetLoadOnCondition(axle, KSM.POINT_LOAD, 1e-12)
 
         return uvec_json
-
-    def getMovingConditionVariable(self, axle, Variable):
-        # This assumes that only one condition contains the moving load has values:
-        values = [0.0, 0.0, 0.0]
-        for condition in axle.Conditions:
-            cond_values = condition.GetValue(Variable)
-            for i in range(3):
-                values[i] += cond_values[i]
-        return KratosMultiphysics.Vector(values)
 
     def add_empty_variable_to_parameters(self,
                                          json_data: KratosMultiphysics.Parameters,
@@ -136,7 +128,8 @@ class StemUvecController:
         """
 
         self.add_empty_variable_to_parameters(json_data, axle_number, variable_json)
-        json_data[variable_json][axle_number].SetVector(self.getMovingConditionVariable(axle_model_part, variable_kratos))
+        json_data[variable_json][axle_number].SetVector(
+            KratosRail.UvecUtilities.GetMovingConditionVariable(axle_model_part, variable_kratos))
 
     def update_uvec_from_kratos(self, json_data: KratosMultiphysics.Parameters):
         """
@@ -155,17 +148,3 @@ class StemUvecController:
                 json_data, axle_number, axle_model_part, "u", KratosMultiphysics.DISPLACEMENT)
             self.update_uvec_variable_from_kratos(
                 json_data, axle_number, axle_model_part, "theta", KratosMultiphysics.ROTATION)
-
-    @staticmethod
-    def __transfer_load_from_model_part_to_conditions(model_part: KratosMultiphysics.ModelPart, precision=1e-12):
-        """
-        This function transfers the point load from the model part to the condition which contains a non-zero value.
-
-        Args:
-            - model_part (KratosMultiphysics.ModelPart): model part containing the conditions
-            - precision (float): precision for the zero check
-        """
-
-        for condition in model_part.Conditions:
-            if not all(abs(load_magnitude) < precision for load_magnitude in condition.GetValue(KSM.POINT_LOAD)):
-                condition.SetValue(KSM.POINT_LOAD, model_part.GetValue(KSM.POINT_LOAD))

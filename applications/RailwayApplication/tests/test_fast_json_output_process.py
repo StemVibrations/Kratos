@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import KratosMultiphysics
 from KratosMultiphysics.RailwayApplication.fast_json_output_process import FastJsonOutputProcess
