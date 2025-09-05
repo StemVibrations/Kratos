@@ -41,10 +41,10 @@ class KratosRailwayAddNodalParametersTests(KratosUnittest.TestCase):
 
 
         # check if nodal mass is now set on element rather than properties
-        self.assertAllmostEqual(mass_element.GetValue(KratosMultiphysics.NODAL_MASS), 1.0)
+        self.assertAlmostEqual(mass_element.GetValue(KratosMultiphysics.NODAL_MASS), 1.0)
 
         # check if young modulus has not been set
-        self.assertAllmostEqual(mass_element.GetValue(KratosMultiphysics.YOUNG_MODULUS), 0.0)
+        self.assertAlmostEqual(mass_element.GetValue(KratosMultiphysics.YOUNG_MODULUS), 0.0)
 
 
 
@@ -86,14 +86,14 @@ class KratosRailwayAddNodalParametersTests(KratosUnittest.TestCase):
         process.ExecuteInitialize()
 
         # check if nodal mass is now set on element rather than properties
-        self.assertAllmostEqual(spring_damper_element.GetValue(KratosMultiphysics.NODAL_MASS), 1.0)
+        self.assertAlmostEqual(spring_damper_element.GetValue(KratosMultiphysics.NODAL_MASS), 1.0)
         self.assertVectorAlmostEqual(spring_damper_element.GetValue(KSM.NODAL_DISPLACEMENT_STIFFNESS), [0, 0, 1.0])
         self.assertVectorAlmostEqual(spring_damper_element.GetValue(KSM.NODAL_ROTATIONAL_STIFFNESS), [0, 1, 1.0])
         self.assertVectorAlmostEqual(spring_damper_element.GetValue(KSM.NODAL_DAMPING_RATIO), [0, 0, 2.0])
         self.assertVectorAlmostEqual(spring_damper_element.GetValue(KSM.NODAL_ROTATIONAL_DAMPING_RATIO), [0, 2, 2.0])
 
         # check if young modulus has not been set
-        self.assertAllmostEqual(spring_damper_element.GetValue(KratosMultiphysics.YOUNG_MODULUS), 0.0)
+        self.assertAlmostEqual(spring_damper_element.GetValue(KratosMultiphysics.YOUNG_MODULUS), 0.0)
 
 if __name__ == '__main__':
     KratosUnittest.main()

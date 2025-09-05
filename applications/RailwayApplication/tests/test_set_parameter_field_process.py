@@ -31,7 +31,7 @@ class KratosRailwaySetParameterFieldTests(KratosUnittest.TestCase):
 
         variable = process.GetVariableBasedOnString()
 
-        self.assertAreEqual(variable, Kratos.YOUNG_MODULUS)
+        self.assertAlmostEqual(variable, Kratos.YOUNG_MODULUS)
 
     def test_GetVariableBasedOnString_non_existing_variable_in_python(self):
         """

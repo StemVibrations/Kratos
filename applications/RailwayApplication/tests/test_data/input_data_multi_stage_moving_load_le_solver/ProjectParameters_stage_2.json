@@ -122,7 +122,7 @@
         "loads_process_list": [
             {
                 "python_module": "set_moving_load_process",
-                "kratos_module": "StemApplication",
+                "kratos_module": "RailwayApplication",
                 "process_name": "SetMovingLoadProcess",
                 "Parameters": {
                     "load": [

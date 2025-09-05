@@ -3,8 +3,9 @@ from typing import Union, Tuple, List
 from pathlib import Path
 
 import KratosMultiphysics as Kratos
-import KratosMultiphysics.StemApplication.geomechanics_analysis as analysis
+import KratosMultiphysics.RailwayApplication.geomechanics_analysis as analysis
 
+RAILWAY_TEST_DIR = Path("applications/RailwayApplication/tests/")
 
 class Utils:
 

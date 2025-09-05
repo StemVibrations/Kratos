@@ -3,6 +3,8 @@ from KratosMultiphysics.RailwayApplication.geomechanics_U_Pw_solver import UPwUv
 
 import KratosMultiphysics.KratosUnittest as KratosUnittest
 
+from utils import RAILWAY_TEST_DIR
+
 class KratosRailwayUPwSolverTests(KratosUnittest.TestCase):
 
     def test_ConstructSolver_invalid_time_stepping(self):
@@ -115,7 +117,7 @@ class KratosRailwayUPwSolverTests(KratosUnittest.TestCase):
 
         # add material parameters
         default_settings["material_import_settings"]["materials_filename"].SetString(
-            "tests/test_data/input_data_multi_stage_uvec/MaterialParameters.json")
+            str(RAILWAY_TEST_DIR / "test_data/input_data_multi_stage_uvec/MaterialParameters.json"))
 
         default_settings["rotation_dofs"].SetBool(True)
         default_settings["solution_type"].SetString("dynamic")

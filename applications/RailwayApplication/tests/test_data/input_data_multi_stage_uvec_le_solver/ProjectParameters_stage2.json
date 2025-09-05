@@ -113,7 +113,7 @@
     }],
     "loads_process_list": [{
 		"python_module" : "set_multiple_moving_loads_process",
-        "kratos_module" : "KratosMultiphysics.StemApplication",
+        "kratos_module" : "KratosMultiphysics.RailwayApplication",
         "process_name"          : "SetMultipleMovingLoadsProcess",
         "Parameters"            : {
             "model_part_name" : "PorousDomain.moving_load",

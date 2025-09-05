@@ -35,7 +35,7 @@ def CreateSolver(model, custom_settings):
     custom_settings["solver_settings"]["time_stepping"]["end_time"] = custom_settings["problem_data"]["end_time"]
     custom_settings["solver_settings"]["time_stepping"]["start_time"] = custom_settings["problem_data"]["start_time"]
 
-    module_full_name = 'KratosMultiphysics.StemApplication.' + solver_module_name
+    module_full_name = 'KratosMultiphysics.RailwayApplication.' + solver_module_name
     solver = import_module(module_full_name).CreateSolver(model, custom_settings["solver_settings"])
 
     return solver

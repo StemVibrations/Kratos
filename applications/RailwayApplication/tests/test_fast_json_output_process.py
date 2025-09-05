@@ -6,6 +6,8 @@ from KratosMultiphysics.RailwayApplication.fast_json_output_process import FastJ
 
 import KratosMultiphysics.KratosUnittest as KratosUnittest
 
+from utils import RAILWAY_TEST_DIR
+
 class KratosRailwayFastJsonOutputProcessTests(KratosUnittest.TestCase):
     def test_fast_json_output_process(self):
         """
@@ -29,16 +31,16 @@ class KratosRailwayFastJsonOutputProcessTests(KratosUnittest.TestCase):
         node.SetSolutionStepValue(KratosMultiphysics.VELOCITY, set_velocity)
         node.SetSolutionStepValue(KratosMultiphysics.DISPLACEMENT, set_displacement)
 
-        json_output_parameters = KratosMultiphysics.Parameters( """{
+        json_output_parameters = KratosMultiphysics.Parameters( json.dumps({
                 "model_part_name": "json_model_part",
-                "output_file_name": "tests/test_data/test_fast_json_output.json",
+                "output_file_name": str(RAILWAY_TEST_DIR / "test_data/test_fast_json_output.json"),
                 "output_variables": [
                     "VELOCITY",
                     "DISPLACEMENT"
                 ],
                 "gauss_points_output_variables": [],
                 "time_frequency": 1e-5
-                }""" )
+                } ))
 
 
         # execute the FastJsonOutputProcess
@@ -49,7 +51,7 @@ class KratosRailwayFastJsonOutputProcessTests(KratosUnittest.TestCase):
         process.ExecuteFinalizeSolutionStep()
 
         # Get the output from the JSON file
-        with open("tests/test_data/test_fast_json_output.json", 'r') as f:
+        with open(RAILWAY_TEST_DIR / "test_data/test_fast_json_output.json", 'r') as f:
             data = json.load(f)
 
         displacement_node_1 = [data["NODE_1"]["DISPLACEMENT_X"][0], data["NODE_1"]["DISPLACEMENT_Y"][0], data["NODE_1"]["DISPLACEMENT_Z"][0]]
@@ -61,7 +63,7 @@ class KratosRailwayFastJsonOutputProcessTests(KratosUnittest.TestCase):
         self.assertVectorAlmostEqual(velocity_node_1, set_velocity)
 
         # Clean up the output file
-        output_file_path = Path("tests/test_data/test_fast_json_output.json")
+        output_file_path = RAILWAY_TEST_DIR /"test_data/test_fast_json_output.json"
         if output_file_path.exists():
             output_file_path.unlink()
 

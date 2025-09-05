@@ -30,8 +30,7 @@
         "reform_dofs_at_each_step":           false,
         "nodal_smoothing":                    false,
         "block_builder":                      true,
-        "solution_type":                      "quasi-static",
-        "scheme_type":                        "backward-euler",
+        "solution_type":                      "static",
         "reset_displacements":                false,
         "newmark_beta":                       0.25,
         "newmark_gamma":                      0.5,
@@ -114,7 +113,7 @@
     }],
     "loads_process_list": [{
 		"python_module" : "set_multiple_moving_loads_process",
-        "kratos_module" : "KratosMultiphysics.StemApplication",
+        "kratos_module" : "KratosMultiphysics.RailwayApplication",
         "process_name"          : "SetMultipleMovingLoadsProcess",
         "Parameters"            : {
             "model_part_name" : "PorousDomain.moving_load",
