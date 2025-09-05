@@ -1,0 +1,76 @@
+name: Build wheels
+
+on:
+  workflow_dispatch:
+
+# for cancelling redundant runs
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changed-files:
+    runs-on: ubuntu-latest
+    # see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-defining-outputs-for-a-job
+    outputs:
+      files: ${{ steps.get_files.outputs.changed_files }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: get_files
+        run: |
+          echo "changed_files=$(python3 .github/get_files_changed_in_pr.py)" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+
+
+  windows:
+    runs-on: windows-2022
+    needs: changed-files
+    env:
+      KRATOS_BUILD_TYPE: Custom
+      KRATOS_CI_CHANGED_FILES: ${{needs.changed-files.outputs.files}}
+      KRATOS_CI_APPLICATIONS: ".github/workflows/ci_apps_windows.json"
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: CI configuration
+      shell: bash
+      run: python3 kratos/python_scripts/testing/ci_utilities.py
+
+    - name: Download boost
+      run: |
+        $url = "https://archives.boost.io/release/1.87.0/source/boost_1_87_0.tar.gz"
+        (New-Object System.Net.WebClient).DownloadFile($url, "$env:TEMP\boost.tar.gz")
+        7z.exe x "$env:TEMP\boost.tar.gz" -o"$env:TEMP\boostArchive" -y | Out-Null
+        7z.exe x "$env:TEMP\boostArchive" -o"$env:TEMP\boost" -y | Out-Null
+
+    - name: Installing dependencies
+      shell: cmd
+      run: |
+        pip install numpy
+        pip install sympy
+        pip install scipy
+        pip install h5py
+        pip install parameterized
+        pip install setuptools
+
+    - name: Build wheels
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\scripts\wheels\windows\build.ps1"
+
+    - name: Upload Kratos wheels
+      uses: actions/upload-artifact@v4
+      with:
+        name: kratos-wheels-windows
+        path: "${{ github.workspace }}/data_swap_guest"
+
