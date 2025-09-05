@@ -91,13 +91,8 @@ foreach ($python in $pythons){
     $env:python = $python
 
     cd $kratosRoot
-#     git clean -ffxd
-#     mkdir "$($wheelOutDir)"
-
 
     $pythonLocation = (Get-Command python).Source
-#     $pythonLocation = "$($env:pythonRoot)\$($python)\python.exe"
-#     $pythonLocation = python
     $prefixLocation = "$($kratosRoot)\bin\Release\python_$($python)"
 
     build_interface $pythonLocation $prefixLocation

@@ -1,13 +1,12 @@
 #!/bin/bash
-PYTHONS=("312")
-export KRATOS_VERSION="10.3.0"
+PYTHONS=("38" "39" "310" "311" "312" "313")
+export KRATOS_VERSION="10.2.3"
 
 BASE_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
-export KRATOS_ROOT="."
-WHEEL_ROOT="./wheel"
-WHEEL_OUT="./data_swap_guest"
-mkdir $WHEEL_OUT
-CORE_LIB_DIR="./coreLibs"
+export KRATOS_ROOT="/workspace/kratos/Kratos"
+WHEEL_ROOT="/workspace/wheel"
+WHEEL_OUT="/data_swap_guest"
+CORE_LIB_DIR="/workspace/coreLibs"
 
 # Created the wheel building directory.
 setup_wheel_dir () {
@@ -121,7 +120,7 @@ build_core () {
 	PYTHON_LOCATION=$1
     PREFIX_LOCATION=$2
 
-	cp ./scripts/wheels/linux/configure.sh ./configure.sh
+	cp /workspace/kratos/Kratos/scripts/wheels/linux/configure.sh ./configure.sh
 	chmod +x configure.sh
 	./configure.sh $PYTHON_LOCATION $PREFIX_LOCATION
 
@@ -135,7 +134,7 @@ build_interface () {
 	PYTHON_LOCATION=$1
     PREFIX_LOCATION=$2
 
-	cp ./scripts/wheels/linux/configure.sh ./configure.sh
+	cp /workspace/kratos/Kratos/scripts/wheels/linux/configure.sh ./configure.sh
 	chmod +x configure.sh
 	./configure.sh $PYTHON_LOCATION $PREFIX_LOCATION
 
