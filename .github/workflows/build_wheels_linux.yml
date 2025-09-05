@@ -91,7 +91,7 @@ jobs:
         rm -rf "${MMG_DIR}"
 
     - name: Build wheels
-      shell: pwsh
+      shell: bash
       run: |
         bash "${GITHUB_WORKSPACE}/scripts/wheels/linux/build.sh"
 
