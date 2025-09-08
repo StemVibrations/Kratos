@@ -56,7 +56,6 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt install -y cmake git build-essential "python${{ matrix.python-version }}-dev"
 
     - name: Install Boost
       run: |
