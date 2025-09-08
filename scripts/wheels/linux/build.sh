@@ -1,6 +1,6 @@
 #!/bin/bash
 PYTHONS=("3.11")
-export KRATOS_VERSION="10.2.3"
+export KRATOS_VERSION="10.3.0"
 export PYTHON="3.11"
 
 BASE_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
