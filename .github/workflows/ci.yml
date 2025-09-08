@@ -168,7 +168,7 @@ jobs:
         export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/bin/${{ matrix.build-type }}/libs
         python3 kratos/python_scripts/testing/run_cpp_mpi_tests.py --mpi_flags "--hostfile ${GITHUB_WORKSPACE}/ci_hostfile" -n 4
 
-   
+
 
   windows:
     runs-on: windows-2022
@@ -227,5 +227,5 @@ jobs:
         python kratos/python_scripts/testing/run_python_tests.py -l nightly -c python
 
 
-  
+
 
