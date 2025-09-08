@@ -40,9 +40,9 @@ cmake -H"${KRATOS_SOURCE}" -B"${KRATOS_BUILD}/${KRATOS_BUILD_TYPE}"             
 -DCMAKE_CXX_COMPILER=/usr/bin/g++                                                    \
 -DCMAKE_CXX_STANDARD=17                                                              \
 -DCMAKE_CXX_STANDARD_REQUIRED=ON                                                     \
--DCMAKE_CXX_FLAGS="-msse3 -Werror -Wno-deprecated-declarations -Wignored-qualifiers" \
+-DCMAKE_CXX_FLAGS="-msse3 -Wno-deprecated-declarations -Wignored-qualifiers" \
 -DCMAKE_C_FLAGS="-msse3"                                                             \
--DBOOST_ROOT="/boost/boost_1_74_0"                                                   \
+-DBOOST_ROOT="/external_libraries/boost/boost_1_87_0"                                                   \
 -DLAPACK_LIBRARIES="/usr/lib64/liblapack.so.3"                                       \
 -DBLAS_LIBRARIES="/usr/lib64/libblas.so.3"                                           \
 -DINCLUDE_MMG=ON                                                                     \
