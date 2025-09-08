@@ -61,8 +61,9 @@ jobs:
       run: |
         BOOST_DIR="${BOOST_INSTALL_DIR}"
         mkdir -p "${BOOST_DIR}"
-        wget -O /tmp/boost_1_87_0.tar.gz https://boostorg.jfrog.io/artifactory/main/release/1.87.0/source/boost_1_87_0.tar.gz
+        wget -O /tmp/boost_1_87_0.tar.gz https://archives.boost.io/release/1.87.0/source/boost_1_87_0.tar.gz
         tar -xzf /tmp/boost_1_87_0.tar.gz -C "${BOOST_DIR}" --strip-components=1
+
 
     - name: Install MMG
       run: |
