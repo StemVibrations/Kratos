@@ -5,7 +5,7 @@ from pathlib import Path
 import KratosMultiphysics as Kratos
 import KratosMultiphysics.RailwayApplication.geomechanics_analysis as analysis
 
-RAILWAY_TEST_DIR = Path("applications/RailwayApplication/tests/")
+RAILWAY_TEST_DIR = Path(os.path.dirname(__file__))
 
 class Utils:
 
