@@ -6,7 +6,8 @@ export PYTHON="3.11"
 BASE_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 export KRATOS_ROOT="$(pwd)"
 WHEEL_ROOT="$KRATOS_ROOT/wheel"
-WHEEL_OUT="$KRATOS_ROOT/data_swap_guest"
+WHEEL_OUT="$GITHUB_WORKSPACE/data_swap_guest"
+mkdir -p $WHEEL_OUT
 CORE_LIB_DIR="$KRATOS_ROOT/coreLibs"
 
 # Created the wheel building directory.
@@ -25,7 +26,7 @@ build_core_wheel () {
 
     PREFIX_LOCATION=$1
 
-    mkdir ${WHEEL_ROOT}/KratosMultiphysics
+#    mkdir ${WHEEL_ROOT}/KratosMultiphysics
 
     cp ${PREFIX_LOCATION}/KratosMultiphysics/*       ${WHEEL_ROOT}/KratosMultiphysics
     cp ${KRATOS_ROOT}/kratos/KratosMultiphysics.json ${WHEEL_ROOT}/wheel.json
@@ -142,14 +143,20 @@ build_interface () {
 
 # Core can be build independently of the python version.
 # Install path should be useless here.
-echo "Starting core build"
-build_core python3.11 ${KRATOS_ROOT}/bin/core
-echo "Finished core build"
 
 for PYTHON_VERSION in  "${PYTHONS[@]}"
 do
+  PYTHON_LOCATION=$(which python$PYTHON_VERSION)
 
-    PYTHON_LOCATION=$(which python$PYTHON_VERSION)
+  $PYTHON_LOCATION -m pip install setuptools wheel auditwheel
+
+  echo "Starting core build"
+  build_core $PYTHON_LOCATION ${KRATOS_ROOT}/bin/core
+  echo "Finished core build"
+
+
+
+
 
     echo "Starting build for python${PYTHON_VERSION}"
     PREFIX_LOCATION="$KRATOS_ROOT/bin/Release/python_$PYTHON_VERSION"
