@@ -1,5 +1,5 @@
 {
-	"wheel_name": "KratosRailway",
+	"wheel_name": "KratosRailwayApplication",
 	"included_modules": ["RailwayApplication"],
 	"included_binaries": ["RailwayApplication.*", "KratosRailwayCore.*", "libKratosRailwayCore.*"],
     "excluded_binaries": [],
