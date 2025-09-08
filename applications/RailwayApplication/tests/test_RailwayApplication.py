@@ -1,4 +1,3 @@
-# import Kratos
 
 from KratosMultiphysics import *
 from KratosMultiphysics.RailwayApplication import *
@@ -7,7 +6,6 @@ from KratosMultiphysics.RailwayApplication import *
 import KratosMultiphysics.KratosUnittest as KratosUnittest
 
 # Import the tests of test_classes to create the suits
-
 from test_add_nodal_parameters import KratosRailwayAddNodalParametersTests
 from test_call_uvec import KratosRailwayCallUvecTests
 from test_fast_json_output_process import KratosRailwayFastJsonOutputProcessTests

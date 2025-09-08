@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 from shutil import rmtree
 
 from utils import assert_files_equal, Utils, RAILWAY_TEST_DIR
