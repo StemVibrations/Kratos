@@ -33,10 +33,10 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      kratos_version: "10.3.0"
+      kratos_version: "10.3.1"
     steps:
       - name: Set Kratos version
-        run: echo "kratos_version=10.3.0" >> $GITHUB_OUTPUT
+        run: echo "kratos_version=10.3.1" >> $GITHUB_OUTPUT
 
 
   windows:
