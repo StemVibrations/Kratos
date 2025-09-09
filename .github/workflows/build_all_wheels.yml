@@ -77,10 +77,6 @@ jobs:
       shell: cmd
       run: |
         pip install numpy
-        pip install sympy
-        pip install scipy
-        pip install h5py
-        pip install parameterized
         pip install setuptools
         pip install orjson==3.11.3
 
