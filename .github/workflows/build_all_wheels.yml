@@ -1,8 +1,6 @@
 name: Build all wheels
 
 on:
-  pull_request:
-
   workflow_dispatch:
 
 # for cancelling redundant runs
