@@ -1,7 +1,9 @@
 param([System.String]$cotire="OFF")
 
-$pythons = "312"
-$env:kratos_version = "10.3.0"
+Write-Host "building kratos version: $env:KRATOS_VERSION"
+
+$pythonVersion = $env:PYTHON_VERSION
+$python = $pythonVersion.Replace(".", "")
 
 $kratosRoot = Resolve-Path "."
 $env:kratos_root = $kratosRoot
@@ -66,7 +68,7 @@ function build_core ($pythonLocation, $prefixLocation) {
 
     Write-Host "Debugging: begin cmd.exe call"
     
-    cmd.exe /c "call configure.bat $($pythonLocation) $($kratosRoot) $($prefixLocation) $($numcores)"
+    cmd.exe /c "call configure_wheel.bat $($pythonLocation) $($kratosRoot) $($prefixLocation) $($numcores)"
     cmake --build "$($kratosRoot)/build/Release" --target KratosKernel -- /property:configuration=Release /p:Platform=x64 /p:CL_MPCount=24 /m:1
 }
 
@@ -82,32 +84,34 @@ function build_interface ($pythonLocation, $pythonPath) {
 
 # Core can be built independently of the python version.
 # Install path should be useless here.
-Write-Host "Starting core build"
-# build_core "$($env:pythonRoot)\39\python.exe" ${KRATOS_ROOT}/bin/core
-Write-Host "Finished core build"
+# Write-Host "Starting core build"
+# # build_core "$($env:pythonRoot)\39\python.exe" ${KRATOS_ROOT}/bin/core
+# Write-Host "Finished core build"
 
-foreach ($python in $pythons){
-    Write-Host "Beginning build for python $($python)"
-    $env:python = $python
 
-    cd $kratosRoot
+Write-Host "Beginning build for python $($python)"
+$env:python = $python
 
-    $pythonLocation = (Get-Command python).Source
-    $prefixLocation = "$($kratosRoot)\bin\Release\python_$($python)"
+cd $kratosRoot
 
-    build_interface $pythonLocation $prefixLocation
+$pythonLocation = (Get-Command python).Source
+$prefixLocation = "$($kratosRoot)\bin\Release\python_$($python)"
 
-    Write-Host "Finished build"
 
-    Write-Host "Building Core Wheel"
-    build_core_wheel $pythonLocation $prefixLocation
+build_core $pythonLocation $prefixLocation
+build_interface $pythonLocation $prefixLocation
 
-    $applications = Get-ChildItem -Path "${prefixLocation}\applications" -Directory -Force -ErrorAction SilentlyContinue
-    
-    Write-Host "Building App Wheels"
-    foreach($app in $applications) {
-        build_application_wheel $pythonLocation $app.Name
-    }
+Write-Host "Finished build"
 
-    Write-Host "Finished wheel construction for python $($python)"
+Write-Host "Building Core Wheel"
+build_core_wheel $pythonLocation $prefixLocation
+
+$applications = Get-ChildItem -Path "${prefixLocation}\applications" -Directory -Force -ErrorAction SilentlyContinue
+
+Write-Host "Building App Wheels"
+foreach($app in $applications) {
+    build_application_wheel $pythonLocation $app.Name
 }
+
+Write-Host "Finished wheel construction for python $($python)"
+

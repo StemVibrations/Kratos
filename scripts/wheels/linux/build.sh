@@ -1,7 +1,8 @@
 #!/bin/bash
-PYTHONS=("3.11")
-export KRATOS_VERSION="10.3.0"
-export PYTHON="3.11"
+export PYTHON=$PYTHON_VERSION
+
+echo "All envs:"
+env | sort
 
 BASE_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 export KRATOS_ROOT="$(pwd)"
@@ -144,48 +145,42 @@ build_interface () {
 # Core can be build independently of the python version.
 # Install path should be useless here.
 
-for PYTHON_VERSION in  "${PYTHONS[@]}"
-do
-  PYTHON_LOCATION=$(which python$PYTHON_VERSION)
 
-  $PYTHON_LOCATION -m pip install setuptools wheel auditwheel
+PYTHON_LOCATION=$(which python$PYTHON_VERSION)
 
-  echo "Starting core build"
-  build_core $PYTHON_LOCATION ${KRATOS_ROOT}/bin/core
-  echo "Finished core build"
+$PYTHON_LOCATION -m pip install setuptools wheel auditwheel
 
+echo "Starting core build"
+build_core $PYTHON_LOCATION ${KRATOS_ROOT}/bin/core
+echo "Finished core build"
 
 
+  echo "Starting build for python${PYTHON_VERSION}"
+  PREFIX_LOCATION="$KRATOS_ROOT/bin/Release/python_$PYTHON_VERSION"
 
+  $PYTHON_LOCATION -m pip install mypy
 
-    echo "Starting build for python${PYTHON_VERSION}"
-    PREFIX_LOCATION="$KRATOS_ROOT/bin/Release/python_$PYTHON_VERSION"
+  build_interface $PYTHON_LOCATION $PREFIX_LOCATION
 
-    $PYTHON_LOCATION -m pip install mypy
+cd $KRATOS_ROOT
+export HASH=$(git show -s --format=%h) # Used in version number
+export LD_LIBRARY_PATH=${PREFIX_LOCATION}/libs:$BASE_LD_LIBRARY_PATH
+echo $LD_LIBRARY_PATH
 
-    build_interface $PYTHON_LOCATION $PREFIX_LOCATION
+  echo "Building Core Wheel"
+  build_core_wheel $PREFIX_LOCATION
 
-	cd $KRATOS_ROOT
-	export HASH=$(git show -s --format=%h) # Used in version number
-	export LD_LIBRARY_PATH=${PREFIX_LOCATION}/libs:$BASE_LD_LIBRARY_PATH
-	echo $LD_LIBRARY_PATH
+  echo "Building App Wheels"
+  for APPLICATION in $(ls -d ${PREFIX_LOCATION}/applications/*)
+  do
+      APPNAME=$(basename "$APPLICATION")
+      echo "Building ${APPNAME} Wheel"
+      build_application_wheel $APPNAME
+  done
 
-    echo "Building Core Wheel"
-    build_core_wheel $PREFIX_LOCATION
+  echo "Building Bundle Wheel"
+  build_kratos_all_wheel $PREFIX_LOCATION
 
-    echo "Building App Wheels"
-    for APPLICATION in $(ls -d ${PREFIX_LOCATION}/applications/*)
-    do
-        APPNAME=$(basename "$APPLICATION")
-        echo "Building ${APPNAME} Wheel"
-        build_application_wheel $APPNAME
-    done
+echo finished build for python${PYTHON_VERSION}
 
-    echo "Building Bundle Wheel"
-    build_kratos_all_wheel $PREFIX_LOCATION
-
-	echo finished build for python${PYTHON_VERSION}
-
-	export LD_LIBRARY_PATH=$BASE_LD_LIBRARY_PATH
-
-done
+export LD_LIBRARY_PATH=$BASE_LD_LIBRARY_PATH

@@ -1,0 +1,172 @@
+name: Build all wheels
+
+on:
+  workflow_dispatch:
+
+# for cancelling redundant runs
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changed-files:
+    runs-on: ubuntu-latest
+    # see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-defining-outputs-for-a-job
+    outputs:
+      files: ${{ steps.get_files.outputs.changed_files }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: get_files
+        run: |
+          echo "changed_files=$(python3 .github/get_files_changed_in_pr.py)" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      KRATOS_VERSION: ${{ steps.set_version.outputs.KRATOS_VERSION }}
+    steps:
+      - id: set_version
+        run: echo "KRATOS_VERSION=10.3.1" >> $GITHUB_OUTPUT
+
+
+  windows:
+    runs-on: windows-2022
+    needs:
+      - changed-files
+      - setup
+    strategy:
+      matrix:
+        python-version: [ '3.10', '3.11', '3.12']
+    env:
+      KRATOS_BUILD_TYPE: Custom
+      KRATOS_CI_CHANGED_FILES: ${{needs.changed-files.outputs.files}}
+      KRATOS_CI_APPLICATIONS: ".github/workflows/ci_apps_windows.json"
+      kratos_version: ${{ needs.setup.outputs.KRATOS_VERSION }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set PYTHON_VERSION env
+      run: echo "PYTHON_VERSION=${{ matrix.python-version }}" >> $env:GITHUB_ENV
+      shell: pwsh
+
+    - name: CI configuration
+      shell: bash
+      run: python3 kratos/python_scripts/testing/ci_utilities.py
+
+    - name: Download boost
+      run: |
+        $url = "https://archives.boost.io/release/1.87.0/source/boost_1_87_0.tar.gz"
+        (New-Object System.Net.WebClient).DownloadFile($url, "$env:TEMP\boost.tar.gz")
+        7z.exe x "$env:TEMP\boost.tar.gz" -o"$env:TEMP\boostArchive" -y | Out-Null
+        7z.exe x "$env:TEMP\boostArchive" -o"$env:TEMP\boost" -y | Out-Null
+
+    - name: Installing dependencies
+      shell: cmd
+      run: |
+        pip install numpy
+        pip install setuptools
+        pip install wheel
+        pip install orjson==3.11.3
+
+    - name: Build wheels
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\scripts\wheels\windows\build.ps1"
+
+    - name: Upload Kratos wheels
+      uses: actions/upload-artifact@v4
+      with:
+        name: kratos-wheels-windows-py${{ matrix.python-version }}
+        path: "${{ github.workspace }}/data_swap_guest"
+
+
+  linux:
+    runs-on: ubuntu-latest
+    needs:
+      - changed-files
+      - setup
+    strategy:
+      matrix:
+        python-version: [ '3.10', '3.11', '3.12' ]
+    env:
+      KRATOS_VERSION: ${{ needs.setup.outputs.KRATOS_VERSION }}
+      KRATOS_BUILD_TYPE: Custom
+      KRATOS_CI_CHANGED_FILES: ${{needs.changed-files.outputs.files}}
+      KRATOS_CI_APPLICATIONS: ".github/workflows/ci_apps_linux.json"
+      MMG_INSTALL_DIR: "${{ github.workspace }}/external_libraries/mmg/mmg_5_8_0"
+      BOOST_INSTALL_DIR: "${{ github.workspace }}/external_libraries/boost/boost_1_87_0"
+      CMAKE_PREFIX_PATH: "${{ github.workspace }}/external_libraries/mmg/mmg_5_8_0:${{ github.workspace }}/external_libraries/boost/boost_1_87_0"
+      LD_LIBRARY_PATH: "${{ github.workspace }}/external_libraries/mmg/mmg_5_8_0/lib:$LD_LIBRARY_PATH"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set PYTHON_VERSION env
+        run: echo "PYTHON_VERSION=${{ matrix.python-version }}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+
+      - name: Install Boost
+        run: |
+          BOOST_DIR="${BOOST_INSTALL_DIR}"
+          mkdir -p "${BOOST_DIR}"
+          wget -O /tmp/boost_1_87_0.tar.gz https://archives.boost.io/release/1.87.0/source/boost_1_87_0.tar.gz
+          tar -xzf /tmp/boost_1_87_0.tar.gz -C "${BOOST_DIR}" --strip-components=1
+
+      - name: Install MMG
+        run: |
+          WORKSPACE="$(pwd)"
+          MMG_DIR="${WORKSPACE}/mmg_5_8_0"
+          INSTALL_DIR="${MMG_INSTALL_DIR}"
+          
+          mkdir -p "${MMG_DIR}"
+          mkdir -p "${INSTALL_DIR}"
+          
+          git clone -b "v5.8.0" --depth 1 https://github.com/MmgTools/mmg "${MMG_DIR}"
+          
+          mkdir -p "${MMG_DIR}/build"
+          cd "${MMG_DIR}/build"
+          
+          cmake .. \
+            -DCMAKE_RULE_MESSAGES=OFF \
+            -DCMAKE_C_FLAGS="-w" \
+            -DCMAKE_CXX_FLAGS="-w" \
+            -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
+            -DLIBMMG3D_SHARED=ON \
+            -DLIBMMG2D_SHARED=ON \
+            -DLIBMMGS_SHARED=ON \
+            -DLIBMMG_SHARED=ON
+          
+          make -j"$(nproc)" install
+          
+          cd "${WORKSPACE}"
+          rm -rf "${MMG_DIR}"
+
+      - name: Build wheels
+        shell: bash
+        run: |
+          bash "${GITHUB_WORKSPACE}/scripts/wheels/linux/build.sh"
+
+      - name: Upload Kratos wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: kratos-wheels-linux-py${{ matrix.python-version }}
+          path: "${{ github.workspace }}/data_swap_guest"
+
