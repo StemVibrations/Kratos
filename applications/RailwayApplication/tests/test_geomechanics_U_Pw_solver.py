@@ -167,7 +167,7 @@ class KratosRailwayUPwSolverTests(KratosUnittest.TestCase):
         self.assertEqual(uvec_solver.main_model_part.ProcessInfo[Kratos.STEP], 5)
 
         # call function again with solution type quasi-static
-        default_settings["solution_type"].SetString("quasi_static")
+        default_settings["solution_type"].SetString("static")
         uvec_solver.PrepareModelPart()
 
         # check if the first and second derivative of displacement are set to zero
