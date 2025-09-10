@@ -34,7 +34,7 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      KRATOS_VERSION: "10.3.1"
+      KRATOS_VERSION: ${{ steps.set_version.outputs.KRATOS_VERSION }}
     steps:
       - name: Set Kratos version
         run: echo "KRATOS_VERSION=10.3.1" >> $GITHUB_OUTPUT
