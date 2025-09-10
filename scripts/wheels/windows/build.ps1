@@ -1,5 +1,7 @@
 param([System.String]$cotire="OFF")
 
+Write-Host "building kratos version: $env:KRATOS_VERSION"
+
 $pythonVersion = $env:PYTHON_VERSION
 $python = $pythonVersion.Replace(".", "")
 

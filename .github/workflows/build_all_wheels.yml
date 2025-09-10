@@ -34,10 +34,10 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      kratos_version: "10.3.1"
+      KRATOS_VERSION: "10.3.1"
     steps:
       - name: Set Kratos version
-        run: echo "kratos_version=10.3.1" >> $GITHUB_OUTPUT
+        run: echo "KRATOS_VERSION=10.3.1" >> $GITHUB_OUTPUT
 
 
   windows:
@@ -50,7 +50,7 @@ jobs:
       KRATOS_BUILD_TYPE: Custom
       KRATOS_CI_CHANGED_FILES: ${{needs.changed-files.outputs.files}}
       KRATOS_CI_APPLICATIONS: ".github/workflows/ci_apps_windows.json"
-      KRATOS_VERSION: ${{ needs.setup.outputs.kratos_version }}
+      kratos_version: ${{ needs.setup.outputs.KRATOS_VERSION }}
 
     steps:
     - uses: actions/checkout@v4
@@ -99,7 +99,7 @@ jobs:
       matrix:
         python-version: [ '3.10', '3.11', '3.12' ]
     env:
-      KRATOS_VERSION: ${{ needs.setup.outputs.kratos_version }}
+      KRATOS_VERSION: ${{ needs.setup.outputs.KRATOS_VERSION }}
       KRATOS_BUILD_TYPE: Custom
       KRATOS_CI_CHANGED_FILES: ${{needs.changed-files.outputs.files}}
       KRATOS_CI_APPLICATIONS: ".github/workflows/ci_apps_linux.json"
