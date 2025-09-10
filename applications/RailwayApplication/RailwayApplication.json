@@ -1,7 +1,7 @@
 {
 	"wheel_name": "KratosRailwayApplication",
 	"included_modules": ["RailwayApplication"],
-	"included_binaries": ["RailwayApplication.*", "KratosRailwayCore.*", "libKratosRailwayCore.*"],
+	"included_binaries": ["KratosRailwayApplication.*", "KratosRailwayCore.*", "libKratosRailwayCore.*"],
 	"dependencies": ["KratosMultiphysics==${KRATOS_VERSION}", "KratosStructuralMechanicsApplication==${KRATOS_VERSION}", "KratosLinearSolversApplication==${KRATOS_VERSION}", "KratosGeoMechanicsApplication==${KRATOS_VERSION}", "orjson==3.11.0", "numpy"],
 	"author": "Deltares",
 	"author_email": "aron.noordam@deltares.nl",
