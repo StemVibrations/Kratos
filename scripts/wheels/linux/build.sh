@@ -1,7 +1,8 @@
 #!/bin/bash
 export PYTHON=$PYTHON_VERSION
 
-echo "building kratos version: $KRATOS_VERSION"
+echo "All envs:"
+env | sort
 
 BASE_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 export KRATOS_ROOT="$(pwd)"
