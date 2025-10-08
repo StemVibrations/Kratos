@@ -28,6 +28,8 @@ class StemGeoMechanicsAnalysis(GeoMechanicsAnalysis):
         """
         Initialize stage. This runs initialize AnalysisStage instead of GeoMechanicsAnalysis.Initialize. Such that
         displacements are not set to 0.
+
+        #todo this function can be removed with STEM issue #335
         """
 
         # Run initalize AnalysisStage instead of GeoMechanicsAnalysis.Initialize
