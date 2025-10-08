@@ -9,7 +9,7 @@ def set_install_requirements():
     Creates kratos requirements list
     """
     release_tag = "test_release0.1"
-    kratos_version = "10.3.1"
+    kratos_version = "10.3.1.1"
     python_version_part = ""
     platform_part = ""
 
