@@ -130,10 +130,12 @@ def Factory(settings, Model):
                 "offset"          : 0.0,
                 "serialize"       : false,
                 "clear_at_finalize" : false,
-                "is_externally_managed" : false
+                "is_externally_managed" : false,
+                "motion_type": "base"
             }
             """
                                                      )
+    #todo set default motion_type to "total" with STEM issue #335
     load_settings = settings["Parameters"]
     load_settings.ValidateAndAssignDefaults(default_settings)
 

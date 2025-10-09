@@ -85,6 +85,8 @@ class SetMultipleMovingLoadsProcess(KratosMultiphysics.Process):
             moving_load_parameters.AddBool("serialize", True)
             moving_load_parameters.AddBool("clear_at_finalize", True)
             moving_load_parameters.AddBool("is_externally_managed", True)
+            moving_load_parameters.AddString("motion_type", "base")
+            # todo set motion_type to "total" with STEM issue #335
 
             self.moving_loads.append(StemSetMovingLoadProcess(new_model_part, moving_load_parameters))
             count += 1

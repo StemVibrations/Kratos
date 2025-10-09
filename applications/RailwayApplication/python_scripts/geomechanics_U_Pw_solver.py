@@ -75,7 +75,7 @@ class UPwUvecSolver(UPwGeoSolver):
         self.main_model_part.ProcessInfo.SetValue(KratosMultiphysics.STEP, current_step)
 
         # set first and second derivative of displacement to zero for all nodes in case of quasi-static analysis
-        if self.settings["solution_type"].GetString().lower() == "quasi_static":
+        if self.settings["solution_type"].GetString().lower() == "static":
             self.__reset_derivatives_to_zero()
 
 

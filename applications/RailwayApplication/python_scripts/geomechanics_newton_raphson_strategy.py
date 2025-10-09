@@ -47,7 +47,7 @@ class StemGeoMechanicsNewtonRaphsonLinearElasticStrategyUvec(GeoMechanicNewtonRa
             - uvec_data (dict): The UVEC data.
         """
         super().__init__(model_part, scheme,  convergence_criterion, builder_and_solver,
-                         0, compute_reactions, move_mesh_flag)
+                         1, compute_reactions, move_mesh_flag)
         self.model_part = model_part
         self.max_iters = max_iters
         self.uvec_data = uvec_data["uvec_data"]
