@@ -115,7 +115,7 @@ class UPwUvecSolver(UPwGeoSolver):
             start_time = self.settings["time_stepping"]["start_time"].GetDouble()
 
             # use decimal to avoid floating point errors
-            getcontext().prec = 16
+            getcontext().prec = 12
             if (Decimal(str(end_time)) - Decimal(str(start_time))) % Decimal(str(time_step)) != Decimal("0.0"):
                 raise ValueError("The time step is not a multiple of the total time. Please adjust the time step.")
 
