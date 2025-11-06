@@ -92,7 +92,7 @@ jobs:
 
 
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     needs:
       - changed-files
       - setup
