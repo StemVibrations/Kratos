@@ -21,6 +21,23 @@
 namespace Kratos
 {
 
+
+	void ApplyCPhiReductionProcess::ExecuteBeforeSolutionLoop()
+	{
+		KRATOS_TRY
+			const std::size_t number_of_elements = mrModelPart.NumberOfElements();
+		mElementOriginalPhi.resize(number_of_elements);
+		mElementOriginalC.resize(number_of_elements);
+		IndexType i = 0;
+		for (const Element& rElement : mrModelPart.Elements()) {
+			const auto& r_prop = rElement.GetProperties();
+			mElementOriginalPhi[i] = ConstitutiveLawUtilities::GetFrictionAngleInDegrees(r_prop);
+			mElementOriginalC[i] = ConstitutiveLawUtilities::GetCohesion(r_prop);
+			++i;
+		}
+		KRATOS_CATCH("")
+	}
+
 void ApplyCPhiReductionProcess::ExecuteInitializeSolutionStep()
 {
     KRATOS_TRY
@@ -44,18 +61,37 @@ void ApplyCPhiReductionProcess::ExecuteInitializeSolutionStep()
     double    reduced_c          = 0.;
     IndexType previousPropertyId = -1;
     // Apply C/Phi Reduction procedure for the model part:
-    block_for_each(mrModelPart.Elements(),
-                   [this, &phi, &reduced_phi, &c, &reduced_c, &previousPropertyId](Element& rElement) {
+
+	for (unsigned int i; i < mrModelPart.Elements().size(); ++i) {
+		auto& rElement = *(mrModelPart.ElementsBegin() + i);
+
+    //block_for_each(mrModelPart.Elements(),
+    //               [this, &phi, &reduced_phi, &c, &reduced_c, &previousPropertyId](Element& rElement) {
         // Only compute new c and phi if the Id changes
-        if (rElement.GetProperties().Id() != previousPropertyId) {
-            phi                = GetAndCheckPhi(rElement.GetProperties());
+        //if (rElement.GetProperties().Id() != previousPropertyId) {
+			auto& r_prop = rElement.GetProperties();
+			auto index_of_phi = r_prop[INDEX_OF_UMAT_PHI_PARAMETER];
+			auto index_of_c = r_prop[INDEX_OF_UMAT_C_PARAMETER];
+
+
+            
+            //phi = ConstitutiveLawUtilities::GetFrictionAngleInDegrees(r_prop);
+            phi = mElementOriginalPhi[i];
+            //phi                = GetAndCheckPhi(rElement.GetProperties());
             reduced_phi        = ComputeReducedPhi(phi);
-            c                  = GetAndCheckC(rElement.GetProperties());
+            //c = ConstitutiveLawUtilities::GetCohesion(r_prop);
+            //c                  = GetAndCheckC(rElement.GetProperties());
+			c = mElementOriginalC[i];
             reduced_c          = mReductionFactor * c;
             previousPropertyId = rElement.GetProperties().Id();
-        }
+
+           // std::cout << "element id: " << rElement.Id() << ", cohesion: " << c << ", phi: " << phi << std::endl;
+			//std::cout << "reduced cohesion: " << reduced_c << ", reduced phi: " << reduced_phi << std::endl;
+
+
+        //}
         SetCPhiAtElement(rElement, reduced_phi, reduced_c);
-    });
+    };
     KRATOS_CATCH("")
 }
 

@@ -32,6 +32,8 @@ public:
     {
     }
 
+	void ExecuteBeforeSolutionLoop() override;
+
     void ExecuteInitializeSolutionStep() override;
     void ExecuteFinalizeSolutionStep() override;
     void ExecuteFinalize() override;
@@ -42,6 +44,8 @@ private:
     double     mReductionFactor         = 1.0;
     double     mPreviousReductionFactor = 1.0;
     double     mReductionIncrement      = 0.1;
+	std::vector<double> mElementOriginalPhi;
+	std::vector<double> mElementOriginalC;
 
     [[nodiscard]] double GetAndCheckPhi(const Element::PropertiesType& rProp) const;
 
