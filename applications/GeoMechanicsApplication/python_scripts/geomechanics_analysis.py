@@ -159,10 +159,11 @@ class GeoMechanicsAnalysis(AnalysisStage):
                             self.delta_time *= self.reduction_factor
                             if self.reduction_factor != 1.0:
                                 KratosMultiphysics.Logger.PrintInfo(self._GetSimulationName(), "Down-scaling with factor: ", self.reduction_factor)
-                elif self.reduction_factor != 1.0:
-                    # scale down step and restart
-                    KratosMultiphysics.Logger.PrintInfo(self._GetSimulationName(), "Down-scaling with factor: ", self.reduction_factor)
-                    self.delta_time *= self.reduction_factor
+                else:
+                    if self.reduction_factor != 1.0:
+                        # scale down step and restart
+                        KratosMultiphysics.Logger.PrintInfo(self._GetSimulationName(), "Down-scaling with factor: ", self.reduction_factor)
+                        self.delta_time *= self.reduction_factor
                     self._CheckDeltaTimeSize()
                     # Reset displacements to the initial
                     KratosMultiphysics.VariableUtils().UpdateCurrentPosition(self._GetSolver().GetComputingModelPart().Nodes, KratosMultiphysics.DISPLACEMENT,1)
