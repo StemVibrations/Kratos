@@ -312,8 +312,7 @@ public:
                 BaseType::mpLinearSystemSolver->Solve(rA, rDx, rb);
             }
         } else {
-            KRATOS_WARNING_IF("ResidualBasedBlockBuilderAndSolverLinearElasticDynamic",
-                              BaseType::mOptions.IsNot(SILENT_WARNINGS))
+            KRATOS_WARNING_IF("ResidualBasedBlockBuilderAndSolverLinearElasticDynamic", BaseType::GetEchoLevel() >= 1)
                 << "ATTENTION! setting the RHS to zero!" << std::endl;
         }
 
