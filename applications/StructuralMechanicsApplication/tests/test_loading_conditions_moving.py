@@ -3,6 +3,7 @@ import KratosMultiphysics
 import KratosMultiphysics.StructuralMechanicsApplication as StructuralMechanicsApplication
 import KratosMultiphysics.KratosUnittest as KratosUnittest
 import math
+import numpy as np
 
 class TestLoadingConditionsMoving(KratosUnittest.TestCase):
 
@@ -650,6 +651,17 @@ class TestLoadingConditionsMoving(KratosUnittest.TestCase):
 
         out_of_plane_axis = list({0, 1, 2} - {axis_1, axis_2})[0]
 
+        # set unit vectors
+        v1 = [0, 0, 0]
+        v2 = [0, 0, 0]
+        v3 = [0, 0, 0]
+        v1[axis_1] = 1
+        v2[axis_2] = 1
+        v3[out_of_plane_axis] = 1
+
+        # determine sign of rotation based on coordinate system
+        rotating_sign = np.dot(np.cross(v1, v2), v3)
+
         current_model = KratosMultiphysics.Model()
         mp = current_model.CreateModelPart("solid_part")
         mp.AddNodalSolutionStepVariable(KratosMultiphysics.DISPLACEMENT)
@@ -717,14 +729,14 @@ class TestLoadingConditionsMoving(KratosUnittest.TestCase):
 
         # calculate expected deflection and rotation at the location of the load
         expected_deflection_axis_1, expected_deflection_axis_2 = (
-            self.calculate_deflection_of_beam(disp_left, disp_right, rotation_left, rotation_right, length,
+            self.calculate_deflection_of_beam(disp_left, disp_right,  rotating_sign * rotation_left, rotating_sign * rotation_right, length,
                                               location_load, rotation))
 
         expected_deflection = [0, 0, 0]
         expected_deflection[axis_1] = expected_deflection_axis_1
         expected_deflection[axis_2] = expected_deflection_axis_2
 
-        expected_rotation_plane = self.calculate_rotation_of_beam(disp_left, disp_right, rotation_left, rotation_right,
+        expected_rotation_plane = self.calculate_rotation_of_beam(rotating_sign * disp_left, rotating_sign * disp_right, rotation_left, rotation_right,
                                                                   length,location_load, rotation)
         expected_rotation = [0, 0, 0]
         expected_rotation[out_of_plane_axis] = expected_rotation_plane
@@ -751,6 +763,17 @@ class TestLoadingConditionsMoving(KratosUnittest.TestCase):
 
         # get out of plane axis
         out_of_plane_axis = list({0, 1, 2} - {axis_1, axis_2})[0]
+
+        # set unit vectors
+        v1 = [0, 0, 0]
+        v2 = [0, 0, 0]
+        v3 = [0, 0, 0]
+        v1[axis_1] = 1
+        v2[axis_2] = 1
+        v3[out_of_plane_axis] = 1
+
+        # determine sign of rotation based on coordinate system
+        rotating_sign = np.dot(np.cross(v1, v2), v3)
 
         current_model = KratosMultiphysics.Model()
         mp = current_model.CreateModelPart("solid_part")
@@ -799,7 +822,7 @@ class TestLoadingConditionsMoving(KratosUnittest.TestCase):
         expected_deflection = [0, 0, 0]
         expected_deflection[axis_2] = disp_left * (1 - location_load / length) + disp_right * location_load / length
 
-        expected_rotation = (disp_right - disp_left)/length
+        expected_rotation = rotating_sign * (disp_right - disp_left)/length
 
         cond = mp.CreateNewCondition("MovingLoadCondition3D3N", 1, [1, 2, 3], mp.GetProperties()[1])
 

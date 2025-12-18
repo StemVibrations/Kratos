@@ -552,7 +552,7 @@ Vector MovingLoadCondition< TDim, TNumNodes>::CalculateLoadPointDisplacementVect
 
             if (has_rot_dof) {
                 disp_shear_axis_1 += local_nodal_rotation_matrix(2, ii) * rotational_shape_functions_vector[ii];
-                disp_shear_axis_2 += local_nodal_rotation_matrix(1, ii) * rotational_shape_functions_vector[ii];
+                disp_shear_axis_2 -= local_nodal_rotation_matrix(1, ii) * rotational_shape_functions_vector[ii];
             }
         }
 
@@ -695,7 +695,7 @@ Vector MovingLoadCondition< TDim, TNumNodes>::CalculateLoadPointRotationVector()
         // calculate inner product local displacement and shape functions
         for (IndexType ii = 0; ii < TNumNodes; ++ii) {
 
-            local_rotation_axis_1 += local_disp_matrix(2, ii) * shear_shape_functions_derivatives_vector[ii];
+            local_rotation_axis_1 -= local_disp_matrix(2, ii) * shear_shape_functions_derivatives_vector[ii];
             local_rotation_axis_2 += local_disp_matrix(1, ii) * shear_shape_functions_derivatives_vector[ii];
 
             if (has_rot_dof) {

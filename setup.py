@@ -8,8 +8,8 @@ def set_install_requirements():
     """
     Creates kratos requirements list
     """
-    release_tag = "test_release0.1.1"
-    kratos_version = "10.3.1.1"
+    release_tag = "test_release0.1.2"
+    kratos_version = "10.3.1.3"
     python_version_part = ""
     platform_part = ""
 
@@ -17,7 +17,7 @@ def set_install_requirements():
     if (sys.platform == "win32"):
         platform_part = "-win_amd64.whl"
     elif (sys.platform == "linux"):
-        platform_part = "-manylinux_2_39_x86_64.whl"
+        platform_part = "-manylinux_2_34_x86_64.whl"
 
     # get python version part of the wheel name
 
