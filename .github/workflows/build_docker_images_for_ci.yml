@@ -3,23 +3,6 @@ name: Build Docker Images for CI
 # It intentionally creates all images, such that they are on the same state
 
 on:
-  push:
-    branches:
-      - 'master'
-    paths:
-      - 'scripts/docker_files/docker_file_ci_ubuntu_22_04/*'
-      - 'scripts/docker_files/docker_file_ci_centos_7/*'
-      - 'scripts/docker_files/docker_file_ci_rockylinux8/*'
-      - '.github/workflows/build_docker_images_for_ci.yml'
-  pull_request:
-    branches:
-      - 'master'
-    paths:
-      - 'scripts/docker_files/docker_file_ci_ubuntu_22_04/*'
-      - 'scripts/docker_files/docker_file_ci_centos_7/*'
-      - 'scripts/docker_files/docker_file_ci_rockylinux8/*'
-      - '.github/workflows/build_docker_images_for_ci.yml'
-
   workflow_dispatch:
 
 # for cancelling redundant runs
