@@ -917,7 +917,9 @@ struct get_dimension<Expr, typename std::enable_if<
         !is_tuple<typename std::decay<Expr>::type>::value
     >::type>
 {
-    const static size_t value = std::result_of<traits::multiex_dimension(Expr)>::type::value;
+    const static size_t value =
+    std::invoke_result_t<traits::multiex_dimension, Expr>::value;
+
 };
 
 template <class Expr>

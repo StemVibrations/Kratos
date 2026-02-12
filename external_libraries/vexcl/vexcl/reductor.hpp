@@ -446,17 +446,18 @@ class Reductor {
         typename std::enable_if<
             boost::proto::matches<Expr, multivector_expr_grammar>::value &&
             !boost::proto::matches<Expr, vector_expr_grammar>::value,
-            std::array<result_type, std::result_of<traits::multiex_dimension(Expr)>::type::value>
+            std::array<result_type, std::invoke_result_t<traits::multiex_dimension, Expr>::value>
         >::type
 #endif
-        operator()(const Expr &expr) const {
-            const size_t dim = std::result_of<traits::multiex_dimension(Expr)>::type::value;
-            std::array<result_type, dim> result;
 
-            assign_subexpressions<0, dim, Expr>(result, expr);
+		operator()(const Expr &expr) const {
+			constexpr size_t dim = std::invoke_result_t<traits::multiex_dimension, Expr>::value;
+			std::array<result_type, dim> result;
 
-            return result;
-        }
+			assign_subexpressions<0, dim, Expr>(result, expr);
+
+			return result;
+		}
     private:
         mutable std::vector<backend::command_queue> queue;
 

@@ -75,6 +75,9 @@ public:
      */
     typedef TPointType PointType;
 
+    /// Type of edge geometry
+    using EdgeType = Point2D<TPointType>;
+
     /** Type used for indexing in geometry class.std::size_t used for indexing
     point or integration point access methods and also all other
     methods which need point or integration point index.
@@ -562,6 +565,15 @@ public:
     SizeType FacesNumber() const override
     {
         return 0;
+    }
+
+
+    /// @copydoc Geometry::GenerateEdges
+    GeometriesArrayType GenerateEdges() const override
+    {
+        GeometriesArrayType edges = GeometriesArrayType();
+        edges.push_back(Kratos::make_shared<EdgeType>(this->pGetPoint(0)));
+        return edges;
     }
 
     ///@}
