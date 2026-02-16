@@ -42,6 +42,7 @@ private:
     ModelPart& mrModelPart;
     Vector     mAbsorbingFactors;
     double     mVirtualThickness;
+    bool       mSkipInternalForces;
 };
 
 } // namespace Kratos
