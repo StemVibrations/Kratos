@@ -172,8 +172,14 @@ public:
 
         // apply dirichlet conditions
         BaseType::ApplyDirichletConditions(pScheme, rModelPart, rA, dummy_rDx, rb);
+
+        // no scaling of the diagonal is considered when applying dirichlet conditions to the mass and damping matrix, since they not directly used
+        // to solve Ax = b
+		auto diagonal_scaling_method = BaseType::mScalingDiagonal;
+        BaseType::mScalingDiagonal = SCALING_DIAGONAL::NO_SCALING;
         BaseType::ApplyDirichletConditions(pScheme, rModelPart, mMassMatrix, dummy_rDx, dummy_b);
         BaseType::ApplyDirichletConditions(pScheme, rModelPart, mDampingMatrix, dummy_rDx, dummy_b);
+        BaseType::mScalingDiagonal = diagonal_scaling_method;
 
         if (mCalculateInitialSecondDerivative) {
             this->CalculateInitialSecondDerivative(rModelPart, rA, pScheme);

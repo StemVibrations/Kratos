@@ -92,6 +92,9 @@ class GeoMechanicsAnalysis(AnalysisStage):
         """This function executes the solution loop of the AnalysisStage
         It can be overridden by derived classes
         """
+        self._GetSolver().GetComputingModelPart().ProcessInfo[KratosMultiphysics.START_TIME] = self.start_time
+        self._GetSolver().GetComputingModelPart().ProcessInfo[KratosMultiphysics.END_TIME]   = self.end_time
+
         self._GetSolver().solving_strategy.SetRebuildLevel(self.rebuild_level)
 
         while self.KeepAdvancingSolutionLoop():
@@ -135,7 +138,6 @@ class GeoMechanicsAnalysis(AnalysisStage):
 
                 # do the nonlinear solver iterations
                 self.InitializeSolutionStep()
-                self._GetSolver().Predict()
                 converged = self._GetSolver().SolveSolutionStep()
                 self._GetSolver().solving_strategy.SetStiffnessMatrixIsBuilt(True)
 
@@ -202,9 +204,9 @@ class GeoMechanicsAnalysis(AnalysisStage):
     def ResetIfHasNodalSolutionStepVariable(self, variable):
         if self._GetSolver().main_model_part.HasNodalSolutionStepVariable(variable):
             zero_vector = Kratos.Array3([0.0, 0.0, 0.0])
-            KratosGeo.NodeUtilities.AssignUpdatedVectorVariableToNonFixedComponentsOfNodes(
+            KratosGeo.NodeUtilities.AssignUpdatedVectorVariableToNodes(
                 self._GetSolver().GetComputingModelPart().Nodes, variable, zero_vector, 0)
-            KratosGeo.NodeUtilities.AssignUpdatedVectorVariableToNonFixedComponentsOfNodes(
+            KratosGeo.NodeUtilities.AssignUpdatedVectorVariableToNodes(
                 self._GetSolver().GetComputingModelPart().Nodes, variable, zero_vector, 1)
 
     def PrintAnalysisStageProgressInformation(self):

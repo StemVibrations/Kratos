@@ -58,6 +58,8 @@ public:
 
     /// Geometry as base class.
     typedef Geometry<TPointType> BaseType;
+	
+
 
     /// Pointer definition of Point3D
     KRATOS_CLASS_POINTER_DEFINITION(Point3D);
@@ -75,6 +77,8 @@ public:
      */
     typedef TPointType PointType;
 
+	 /// Type of edge geometry
+    using EdgeType = Point3D<TPointType>;
     /** Type used for indexing in geometry class.std::size_t used for indexing
     point or integration point access methods and also all other
     methods which need point or integration point index.
@@ -563,6 +567,15 @@ public:
     {
         return 0;
     }
+	
+	    /// @copydoc Geometry::GenerateEdges
+    GeometriesArrayType GenerateEdges() const override
+    {
+        GeometriesArrayType edges = GeometriesArrayType();
+        edges.push_back( Kratos::make_shared<EdgeType>( this->pGetPoint( 0 )) );
+        return edges;
+    }
+
 
     ///@}
     ///@name Shape Function
