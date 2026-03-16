@@ -81,39 +81,69 @@ build_kratos_all_wheel () {
 }
 
 # Removes duplicated libraries from existing wheels.
-optimize_wheel(){
+optimize_wheel() {
+    local wheel_dir="${WHEEL_ROOT}/wheelhouse"
+    local tmp_dir="tmp_wheel_extract"
+    local archive_name
 
-    cd ${WHEEL_ROOT}/wheelhouse
-    ARCHIVE_NAME=$(ls .)
-    mkdir tmp
-    unzip ${ARCHIVE_NAME} -d tmp
-    rm $ARCHIVE_NAME
+    cd "${wheel_dir}" || return 1
+    archive_name=$(ls *.whl 2>/dev/null | head -n 1)
+    
+    if [ -z "${archive_name}" ]; then
+        echo "Error: No wheel file found in ${wheel_dir}"
+        return 1
+    fi
 
-    echo "Begin exclude list for ${APPNAME}"
-    echo "List of core libs to be excluded:"
-    echo "$(ls ${CORE_LIB_DIR})"
+    echo "Optimizing wheel: ${archive_name}"
 
-    # Clean excluded libraries
-    for LIBRARY in $(ls tmp/Kratos${APPNAME}.libs)
-    do
-        if [ -f "${CORE_LIB_DIR}/${LIBRARY}" ] || grep $(echo $LIBRARY | cut -f1 -d"-") "${WHEEL_ROOT}/excluded.txt" ; then
-            echo "-- Removing ${LIBRARY} - already present in dependent wheel."
+    mkdir -p "${tmp_dir}"
+    unzip -q "${archive_name}" -d "${tmp_dir}"
+    rm -f "${archive_name}"
 
-            rm tmp/Kratos${APPNAME}.libs/${LIBRARY}     # Try to remove from app dir
+    # 1. ROBUST FOLDER SEARCH: Find the .libs folder, whatever auditwheel named it
+    local libs_dir
+    libs_dir=$(find "${tmp_dir}" -type d -name "*.libs" | head -n 1)
 
-            sed -i "/${LIBRARY}/d" tmp/*.dist-info/RECORD
-        else
-            echo "-- Keeping ${LIBRARY}"
-        fi
-    done
+    if [ -n "${libs_dir}" ] && [ -d "${libs_dir}" ]; then
+        echo "Found auditwheel libs directory: ${libs_dir}"
+        
+        for library_path in "${libs_dir}"/*; do
+            [ -e "${library_path}" ] || continue 
+            
+            local library=$(basename "${library_path}")
+            
+            # 2. STRIP THE AUDITWHEEL HASH: Extract 'libKratosCore' from 'libKratosCore-1a2b3c4d.so'
+            local lib_prefix=$(echo "${library}" | awk -F'-' '{print $1}')
 
-    # Alson clean the possible copies done in the setup.py
-    rm tmp/KratosMultiphysics/.libs/libKratos*
+            # 3. WILDCARD CHECK: Does ANY file starting with this prefix exist in CORE_LIB_DIR?
+            # We also check the excluded.txt just in case.
+            if ls "${CORE_LIB_DIR}/${lib_prefix}"* 1> /dev/null 2>&1 || \
+               grep -q "^${lib_prefix}" "${WHEEL_ROOT}/excluded.txt" 2>/dev/null; then
+                
+                echo "-- Removing ${library} (Matched core prefix: ${lib_prefix})"
+                rm -f "${library_path}"
 
-    cd tmp
-    zip -r ../${ARCHIVE_NAME} ./*
+                # Safely remove from the RECORD file
+                local safe_lib_name=$(echo "${library}" | sed 's/\./\\./g')
+                sed -i "/${safe_lib_name}/d" "${tmp_dir}"/*.dist-info/RECORD
+            else
+                echo "-- Keeping ${library}"
+            fi
+        done
+    else
+        echo "-- No .libs directory found. Auditwheel may not have bundled dependencies here."
+    fi
+
+    # Clean the possible copies done in setup.py
+    rm -f "${tmp_dir}/KratosMultiphysics/.libs/libKratos"*
+
+    # Re-zip the wheel safely
+    cd "${tmp_dir}" || return 1
+    zip -qr "../${archive_name}" .
     cd ..
-    rm -r tmp
+    
+    rm -rf "${tmp_dir}"
+    echo "Optimization complete: ${archive_name}"
 }
 
 # Buils the KratosXCore components for the kernel and applications

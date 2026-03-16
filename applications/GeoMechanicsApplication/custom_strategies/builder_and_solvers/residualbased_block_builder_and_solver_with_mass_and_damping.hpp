@@ -289,14 +289,8 @@ public:
         }
 
         BaseType::ApplyDirichletConditions(pScheme, rModelPart, rA, rDx, rb);
-
-		// no scaling of the diagonal is considered when applying dirichlet conditions to the mass and damping matrix, since they not directly used
-        // to solve Ax = b
-        auto diagonal_scaling_method = BaseType::mScalingDiagonal;
-        BaseType::mScalingDiagonal = SCALING_DIAGONAL::NO_SCALING;
-        BaseType::ApplyDirichletConditions(pScheme, rModelPart, mMassMatrix, dummy_rDx, dummy_b);
-        BaseType::ApplyDirichletConditions(pScheme, rModelPart, mDampingMatrix, dummy_rDx, dummy_b);
-        BaseType::mScalingDiagonal = diagonal_scaling_method;
+        Geo::SparseSystemUtilities::ApplyDirichletConditionsSecondaryMatrix(BaseType::mDofSet, mMassMatrix);
+        Geo::SparseSystemUtilities::ApplyDirichletConditionsSecondaryMatrix(BaseType::mDofSet, mDampingMatrix);
 
         KRATOS_INFO_IF("ResidualBasedBlockBuilderAndSolverWithMassAndDamping", this->GetEchoLevel() == 3)
             << "Before the solution of the system"
@@ -384,7 +378,7 @@ public:
         BuildRHSNoDirichlet(pScheme, rModelPart, rb);
 
         // NOTE: dofs are assumed to be numbered consecutively in the BlockBuilderAndSolver
-        block_for_each(BaseType::mDofSet, [&rb](const Dof<double>& r_dof) {
+        block_for_each(BaseType::mDofSet, [&](Dof<double>& r_dof) {
             if (r_dof.IsFixed()) {
                 const std::size_t i = r_dof.EquationId();
                 rb[i]               = 0.0;
@@ -402,7 +396,7 @@ public:
      */
     Parameters GetDefaultParameters() const override
     {
-        auto default_parameters = Parameters(R"(
+        Parameters default_parameters = Parameters(R"(
         {
             "name"                                 : "block_builder_and_solver_with_mass_and_damping",
             "block_builder"                        : true,
@@ -526,11 +520,11 @@ protected:
 
         // assemble all elements
 
-        const auto n_elements = static_cast<int>(r_elements.size());
-#pragma omp parallel firstprivate(n_elements, rhs_contribution, equation_ids)
+        const int nelements = static_cast<int>(r_elements.size());
+#pragma omp parallel firstprivate(nelements, rhs_contribution, equation_ids)
         {
 #pragma omp for schedule(guided, 512) nowait
-            for (int i = 0; i < n_elements; i++) {
+            for (int i = 0; i < nelements; i++) {
                 typename ElementsArrayType::iterator it = r_elements.begin() + i;
                 // If the element is active
                 if (it->IsActive()) {
@@ -546,9 +540,9 @@ protected:
             rhs_contribution.resize(0, false);
 
             // assemble all conditions
-            const auto n_conditions = static_cast<int>(r_conditions.size());
+            const int nconditions = static_cast<int>(r_conditions.size());
 #pragma omp for schedule(guided, 512)
-            for (int i = 0; i < n_conditions; i++) {
+            for (int i = 0; i < nconditions; i++) {
                 auto it = r_conditions.begin() + i;
                 // If the condition is active
                 if (it->IsActive()) {

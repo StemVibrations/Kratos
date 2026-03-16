@@ -1,13 +1,13 @@
 {
-	"wheel_name": "KratosMultiphysics-all",
+	"wheel_name": "stemkratosmultiphysics-all",
 	"included_modules": [],
 	"included_binaries": [],
 	"dependencies": [
-        "KratosMultiphysics==${KRATOS_VERSION}",
-        "KratosLinearSolversApplication==${KRATOS_VERSION}",
-        "KratosStructuralMechanicsApplication==${KRATOS_VERSION}",
-        "KratosGeoMechanicsApplication==${KRATOS_VERSION}",
-        "KratosRailwayApplication ==${KRATOS_VERSION}"
+        "stemkratosmultiphysics==${KRATOS_VERSION}",
+        "stemkratoslinearsolversapplication==${KRATOS_VERSION}",
+        "stemkratosstructuralmechanicsapplication==${KRATOS_VERSION}",
+        "stemkratosgeomechanicsapplication==${KRATOS_VERSION}",
+        "stemkratosrailwayapplication ==${KRATOS_VERSION}"
     ],
 	"author": "Kratos Team",
 	"author_email": "kratos@listas.cimne.upc.edu",
