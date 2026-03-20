@@ -24,36 +24,36 @@ class StemGeoMechanicsAnalysis(GeoMechanicsAnalysis):
         """
         super().__init__(model, project_parameters)
 
-    def Initialize(self):
-        """
-        Initialize stage. This runs initialize AnalysisStage instead of GeoMechanicsAnalysis.Initialize. Such that
-        displacements are not set to 0.
+    # def Initialize(self):
+    #     """
+    #     Initialize stage. This runs initialize AnalysisStage instead of GeoMechanicsAnalysis.Initialize. Such that
+    #     displacements are not set to 0.
+    #
+    #     #todo this function can be removed with STEM issue #335
+    #     """
+    #
+    #     # Run initalize AnalysisStage instead of GeoMechanicsAnalysis.Initialize
+    #     AnalysisStage.Initialize(self)
+    #
+    #     # In GeoMechanicsAnalysis, DISPLACEMENT and ROTATION will be set to zero every stage. This prevents
+    #     # this behavior in the STEM application. Instead the constitutive law will be reset at the end of each stage.
+    #     self._GetSolver().main_model_part.ProcessInfo[KratosGeo.RESET_DISPLACEMENTS] = self.reset_displacements
+    #     if self.reset_displacements:
+    #         self.ResetIfHasNodalSolutionStepVariable(KratosGeo.TOTAL_DISPLACEMENT)
+    #         Kratos.VariableUtils().UpdateCurrentToInitialConfiguration(
+    #             self._GetSolver().GetComputingModelPart().Nodes)
 
-        #todo this function can be removed with STEM issue #335
-        """
-
-        # Run initalize AnalysisStage instead of GeoMechanicsAnalysis.Initialize
-        AnalysisStage.Initialize(self)
-
-        # In GeoMechanicsAnalysis, DISPLACEMENT and ROTATION will be set to zero every stage. This prevents
-        # this behavior in the STEM application. Instead the constitutive law will be reset at the end of each stage.
-        self._GetSolver().main_model_part.ProcessInfo[KratosGeo.RESET_DISPLACEMENTS] = self.reset_displacements
-        if self.reset_displacements:
-            self.ResetIfHasNodalSolutionStepVariable(KratosGeo.TOTAL_DISPLACEMENT)
-            Kratos.VariableUtils().UpdateCurrentToInitialConfiguration(
-                self._GetSolver().GetComputingModelPart().Nodes)
-
-    def Finalize(self):
-        """
-        Finalize stage and reset constitutive law of each element
-        """
-        super().Finalize()
-
-        for element in self._GetSolver().GetComputingModelPart().Elements:
-            element.ResetConstitutiveLaw()
-
-        # todo this methodology works for linear elastic, but maybe not for non linear materials in multistage analysis
-        # but if this is not done, uvec will not work in multistage analysis. Kratos issue: #13546
+    # def Finalize(self):
+    #     """
+    #     Finalize stage and reset constitutive law of each element
+    #     """
+    #     super().Finalize()
+    #
+    #     for element in self._GetSolver().GetComputingModelPart().Elements:
+    #         element.ResetConstitutiveLaw()
+    #
+    #     # todo this methodology works for linear elastic, but maybe not for non linear materials in multistage analysis
+    #     # but if this is not done, uvec will not work in multistage analysis. Kratos issue: #13546
 
 
     def _CreateSolver(self):
