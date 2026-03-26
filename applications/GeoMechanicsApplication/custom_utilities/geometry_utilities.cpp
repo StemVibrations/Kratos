@@ -24,6 +24,8 @@ std::size_t GetNumberOfCornerPoints(GeometryData::KratosGeometryFamily GeometryF
 {
     switch (GeometryFamily) {
         using enum GeometryData::KratosGeometryFamily;
+	case Kratos_Point:
+		return 1;
     case Kratos_Linear:
         return 2;
     case Kratos_Triangle:
@@ -41,6 +43,8 @@ std::size_t GetNumberOfEdgePoints(GeometryData::KratosGeometryFamily    Geometry
 {
     switch (GeometryOrder) {
         using enum GeometryData::KratosGeometryOrderType;
+    case Kratos_Zero_Order:
+		return 0;
     case Kratos_Linear_Order:
         return 0;
     case Kratos_Quadratic_Order:
