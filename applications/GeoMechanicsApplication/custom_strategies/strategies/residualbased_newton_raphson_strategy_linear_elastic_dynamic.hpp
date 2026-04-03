@@ -126,11 +126,15 @@ public:
         BaseType::Initialize();
         // Note that FindNeighbourElementsOfConditionsProcess and DeactivateConditionsOnInactiveElements are required to be performed before initializing the System and State
         // this means that these operations are done twice in the GeomechanicsSolver in python
-            FindNeighbourElementsOfConditionsProcess{BaseType::GetModelPart()}.Execute();
-        DeactivateConditionsOnInactiveElements{BaseType::GetModelPart()}.Execute();
+        //    FindNeighbourElementsOfConditionsProcess{BaseType::GetModelPart()}.Execute();
+        //DeactivateConditionsOnInactiveElements{BaseType::GetModelPart()}.Execute();
         if (!BaseType::mStiffnessMatrixIsBuilt)
+        {
+            FindNeighbourElementsOfConditionsProcess{ BaseType::GetModelPart() }.Execute();
+            DeactivateConditionsOnInactiveElements{ BaseType::GetModelPart() }.Execute();
             // initialize the system matrices and the initial second derivative
             this->InititalizeSystemAndState();
+        }
 
         KRATOS_CATCH("")
     }
@@ -153,6 +157,9 @@ public:
 
     {
         KRATOS_TRY
+
+
+
         BaseType::InitializeSolutionStep();
 
         // it is required to initialize the mDxTot vector here, as SolveSolutionStep can be called

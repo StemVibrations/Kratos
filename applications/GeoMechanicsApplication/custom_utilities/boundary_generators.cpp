@@ -32,8 +32,8 @@ Geometry<Node>::GeometriesArrayType FacesGenerator::operator()(const Geometry<No
         return rGeometry.GenerateFaces();
     } catch (const Exception&) {
         // Since some of the surface geometries in core do not implement GenerateFaces, but we
-        // know how to recover if the local dimension is 2, we do so here.
-        if (rGeometry.LocalSpaceDimension() == 2) {
+        // know how to recover if the local dimension is smaller than 3, we do so here.
+        if (rGeometry.LocalSpaceDimension() < 3 ) {
             Geometry<Node>::GeometriesArrayType result;
             result.push_back(std::make_shared<Geometry<Node>>(rGeometry));
             return result;
