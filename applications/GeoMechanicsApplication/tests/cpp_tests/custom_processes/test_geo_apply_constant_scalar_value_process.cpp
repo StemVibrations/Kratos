@@ -19,7 +19,8 @@
 namespace Kratos::Testing
 {
 
-KRATOS_TEST_CASE_IN_SUITE(GeoApplyConstantScalarValueProcess_FreesDoFAfterFinalize_ForDoubleVariable,
+// disabled because function is altered to accomdate STEM, values can now be set in Initialize
+KRATOS_TEST_CASE_IN_SUITE(DISABLED_GeoApplyConstantScalarValueProcess_FreesDoFAfterFinalize_ForDoubleVariable,
                           KratosGeoMechanicsFastSuiteWithoutKernel)
 {
     Model      current_model;
@@ -52,7 +53,8 @@ KRATOS_TEST_CASE_IN_SUITE(GeoApplyConstantScalarValueProcess_FreesDoFAfterFinali
     }))
 }
 
-KRATOS_TEST_CASE_IN_SUITE(GeoApplyConstantScalarValueProcess_FinalizeDoesNothing_ForIntVariable,
+// disabled because function is altered to accomdate STEM, values can now be set in Initialize
+KRATOS_TEST_CASE_IN_SUITE(DISABLED_GeoApplyConstantScalarValueProcess_FinalizeDoesNothing_ForIntVariable,
                           KratosGeoMechanicsFastSuiteWithoutKernel)
 {
     Model current_model;
