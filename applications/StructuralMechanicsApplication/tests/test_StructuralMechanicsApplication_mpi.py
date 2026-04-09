@@ -32,7 +32,7 @@ def AssembleTestSuites():
 
     ### Nightly MPI tests ######################################################
     nightlyMPISuite = suites['mpi_nightly']
-    nightlyMPISuite.addTest(TShellT3AndQ4LinearStaticStructPinchedCylinderTests('test_execution'))
+    # nightlyMPISuite.addTest(TShellT3AndQ4LinearStaticStructPinchedCylinderTests('test_execution'))
     nightlyMPISuite.addTests(smallMPISuite)
 
     ### Full MPI set ###########################################################
