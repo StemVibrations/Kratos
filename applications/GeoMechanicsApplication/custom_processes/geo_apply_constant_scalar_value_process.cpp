@@ -61,25 +61,6 @@ void GeoApplyConstantScalarValueProcess::ExecuteInitialize()
         VariableUtils().ApplyFixity(KratosComponents<Variable<double>>::Get(mVariableName), true,
                                     mrModelPart.Nodes());
     }
-
-//    if (mIsInitialized)
-//        return;
-
-    if (KratosComponents<Variable<double>>::Has(mVariableName)) {
-        VariableUtils().SetVariable(KratosComponents<Variable<double>>::Get(mVariableName),
-                                    mDoubleValue, mrModelPart.Nodes());
-    } else if (KratosComponents<Variable<int>>::Has(mVariableName)) {
-        VariableUtils().SetVariable(KratosComponents<Variable<int>>::Get(mVariableName), mIntValue,
-                                    mrModelPart.Nodes());
-    } else if (KratosComponents<Variable<bool>>::Has(mVariableName)) {
-        VariableUtils().SetVariable(KratosComponents<Variable<bool>>::Get(mVariableName),
-                                    mBoolValue, mrModelPart.Nodes());
-    } else {
-        KRATOS_ERROR << "Not able to fix the variable. Attempting to fix variable: " << mVariableName
-                     << std::endl;
-    }
-
-//mIsInitialized = true;
 }
 
 void GeoApplyConstantScalarValueProcess::ExecuteInitializeSolutionStep()

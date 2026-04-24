@@ -60,6 +60,10 @@ class StemSetMovingLoadProcess(KSM.SetMovingLoadProcess):
             load_serializer = KratosMultiphysics.FileSerializer(
                 self.__serialize_file_name, self.__serializer_type)
             load_serializer.Load(f"set_moving_load_process_{self.model_part.Name}", self)
+            load_params = KratosMultiphysics.Parameters()
+            load_serializer.Load("load_value_external", load_params)
+            load_value_external = load_params.GetVector()
+            self.model_part.SetValue(KSM.POINT_LOAD, load_value_external)
 
             is_restarted = self.model_part.ProcessInfo[KratosMultiphysics.IS_RESTARTED]
             self.model_part.ProcessInfo[KratosMultiphysics.IS_RESTARTED] = True
@@ -101,6 +105,12 @@ class StemSetMovingLoadProcess(KSM.SetMovingLoadProcess):
 
             # save the moving load process to file
             save_serializer.Save(f"set_moving_load_process_{self.model_part.Name}", self)
+
+            load_value = self.model_part.GetValue(KSM.POINT_LOAD)
+            load_value_string = f"[{load_value[0]}, {load_value[1]}, {load_value[2]}]"
+
+            array_param = KratosMultiphysics.Parameters(f"{load_value_string}")
+            save_serializer.Save("load_value_external", array_param)
 
         if self.__do_clear:
             self.model_part.Clear()
