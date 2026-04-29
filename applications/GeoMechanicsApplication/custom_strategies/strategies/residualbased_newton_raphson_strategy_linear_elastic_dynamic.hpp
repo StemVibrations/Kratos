@@ -117,16 +117,6 @@ public:
     {
     }
 
-    /**
-     * @brief Initialization of member variables and prior operations
-     */
-    void Initialize() override
-    {
-        KRATOS_TRY
-        BaseType::Initialize();
-        KRATOS_CATCH("")
-    }
-
     void Predict() override
     {
         KRATOS_TRY
@@ -148,10 +138,9 @@ public:
 
         BaseType::InitializeSolutionStep();
 
-        if (!BaseType::mStiffnessMatrixIsBuilt)
-        {
-            FindNeighbourElementsOfConditionsProcess{ BaseType::GetModelPart() }.Execute();
-            DeactivateConditionsOnInactiveElements{ BaseType::GetModelPart() }.Execute();
+        if (!BaseType::mStiffnessMatrixIsBuilt) {
+            FindNeighbourElementsOfConditionsProcess{BaseType::GetModelPart()}.Execute();
+            DeactivateConditionsOnInactiveElements{BaseType::GetModelPart()}.Execute();
 
             // initialize the system matrices and the initial second derivative
             this->InititalizeSystemAndState();
