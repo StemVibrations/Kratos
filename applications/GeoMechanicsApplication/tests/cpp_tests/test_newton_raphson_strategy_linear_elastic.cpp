@@ -439,6 +439,7 @@ KRATOS_TEST_CASE_IN_SUITE(NewtonRaphsonLinearElasticDynamicAllZeroOnRow, KratosG
         model_part, 1e-6, 1e-12, false, false, false);
     // initialize solver
     r_solver.Initialize();
+    r_solver.InitializeSolutionStep();
 
     auto& rSystemMatrix = r_solver.GetSystemMatrix();
 
@@ -511,6 +512,7 @@ KRATOS_TEST_CASE_IN_SUITE(NewtonRaphsonLinearElasticDynamicAllZeroDampingAndLump
         model_part, 1e-6, 1e-12, false, false, false);
     // initialize solver
     r_solver.Initialize();
+	r_solver.InitializeSolutionStep();
 
     auto& rSystemMatrix = r_solver.GetSystemMatrix();
 
@@ -580,9 +582,11 @@ KRATOS_TEST_CASE_IN_SUITE(NewtonRaphsonLinearElasticDynamicAllZeroMassOnDof, Kra
     // create strategy
     auto r_solver = NewtonRaphsonStrategyLinearElasticDynamicTester::CreateValidStrategy(
         model_part, 1e-6, 1e-12, false, false, false);
-    // initialize solver
-    KRATOS_EXPECT_EXCEPTION_IS_THROWN(
-        r_solver.Initialize(),
+    r_solver.Initialize();
+
+    // initialize solution step
+    KRATOS_EXPECT_EXCEPTION_IS_THROWN(    
+        r_solver.InitializeSolutionStep(),
         "The system matrix and the mass matrix do not have values on the same degrees of freedom, "
         "the builder and solver cannot be used in this case.");
 }
@@ -644,6 +648,7 @@ KRATOS_TEST_CASE_IN_SUITE(NewtonRaphsonLinearElasticDynamicAllZeroMassOnFixedDof
 
     // no expection is thrown
     r_solver.Initialize();
+    r_solver.InitializeSolutionStep();
 
     auto& rSystemMatrix = r_solver.GetSystemMatrix();
 
