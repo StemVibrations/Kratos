@@ -124,18 +124,6 @@ public:
     {
         KRATOS_TRY
         BaseType::Initialize();
-        // Note that FindNeighbourElementsOfConditionsProcess and DeactivateConditionsOnInactiveElements are required to be performed before initializing the System and State
-        // this means that these operations are done twice in the GeomechanicsSolver in python
-        //    FindNeighbourElementsOfConditionsProcess{BaseType::GetModelPart()}.Execute();
-        //DeactivateConditionsOnInactiveElements{BaseType::GetModelPart()}.Execute();
-        if (!BaseType::mStiffnessMatrixIsBuilt)
-        {
-            FindNeighbourElementsOfConditionsProcess{ BaseType::GetModelPart() }.Execute();
-            DeactivateConditionsOnInactiveElements{ BaseType::GetModelPart() }.Execute();
-            // initialize the system matrices and the initial second derivative
-            this->InititalizeSystemAndState();
-        }
-
         KRATOS_CATCH("")
     }
 
@@ -158,9 +146,16 @@ public:
     {
         KRATOS_TRY
 
-
-
         BaseType::InitializeSolutionStep();
+
+        if (!BaseType::mStiffnessMatrixIsBuilt)
+        {
+            FindNeighbourElementsOfConditionsProcess{ BaseType::GetModelPart() }.Execute();
+            DeactivateConditionsOnInactiveElements{ BaseType::GetModelPart() }.Execute();
+
+            // initialize the system matrices and the initial second derivative
+            this->InititalizeSystemAndState();
+        }
 
         // it is required to initialize the mDxTot vector here, as SolveSolutionStep can be called
         // multiple times, in a single time step (from an overlaying strategy)
@@ -405,8 +400,6 @@ private:
         typename TSchemeType::Pointer p_scheme     = BaseType::GetScheme();
         typename TBuilderAndSolverType::Pointer p_builder_and_solver = BaseType::GetBuilderAndSolver();
 
-        this->InitializeSolutionStep();
-
         // Initialize non linear iteration for elements here, as the scheme only initializes conditions.
         const auto& r_current_process_info = r_model_part.GetProcessInfo();
         block_for_each(r_model_part.Elements(), [&r_current_process_info](Element& r_element) {
@@ -418,7 +411,6 @@ private:
         p_scheme->InitializeNonLinIteration(r_model_part, rA, rDx, rb);
         p_builder_and_solver->Build(p_scheme, r_model_part, rA, rb);
 
-        this->FinalizeSolutionStep();
         BaseType::mStiffnessMatrixIsBuilt = true;
 
         KRATOS_CATCH("")

@@ -24,6 +24,7 @@
 #include "custom_utilities/sparse_system_utilities.h"
 #include "includes/define.h"
 #include "includes/model_part.h"
+#include "includes/file_serializer.h"
 #include "solving_strategies/builder_and_solvers/residualbased_block_builder_and_solver.h"
 #include "spaces/ublas_space.h"
 #include "utilities/builtin_timer.h"
@@ -134,14 +135,6 @@ public:
         mPreviousOutOfBalanceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
         mCurrentOutOfBalanceVector  = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
 
-        if (mPreviousExternalForceVector.empty()) {
-            // copy external force vector if this is a restart
-            if (rModelPart.GetProcessInfo()[STEP] > 1) {
-                TSparseSpace::Copy(mCurrentExternalForceVector, mPreviousExternalForceVector);
-            } else {
-                mPreviousExternalForceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
-            }
-        }
     }
 
     void Build(typename TSchemeType::Pointer pScheme, ModelPart& rModelPart, TSystemMatrixType& rA, TSystemVectorType& rb) override
@@ -150,19 +143,51 @@ public:
         Timer::Start("Build");
 
         this->BuildLHS(pScheme, rModelPart, rA);
-        this->BuildRHSElementsNoDirichlet(pScheme, rModelPart);
-        this->BuildRHSNoDirichlet(pScheme, rModelPart, rb);
+        this->BuildRHSElementsNoDirichlet(pScheme, rModelPart);       
+        
+        //TSparseSpace::Copy(mConstantElementForceVector, mCurrentExternalForceVector);
+		//TSparseSpace::Copy(mConstantElementForceVector, mPreviousExternalForceVector);
+		mCurrentExternalForceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+        mPreviousExternalForceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+        //this->BuildRHSNoDirichlet(pScheme, rModelPart, rb);
+
+
+		//mPreviousExternalForceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+        //mPreviousExternalForceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+        //TSparseSpace::Copy(mCurrentExternalForceVector, mPreviousExternalForceVector);
+        //
+        //// Does: mCurrentOutOfBalanceVector = mCurrentExternalForceVector - mPreviousExternalForceVector;
+        //TSparseSpace::ScaleAndAdd(1.0, mCurrentExternalForceVector, -1.0,
+        //    mPreviousExternalForceVector, mCurrentOutOfBalanceVector);
+
+        //// Add constraint to the out of balance force before mass and damping components are added, since the mass and damping components are
+        //// already constraint by the constraint mass and damping matrix.
+        //if (!rModelPart.MasterSlaveConstraints().empty()) {
+        //    Timer::Start("ApplyRHSConstraints");
+        //    BaseType::ApplyRHSConstraints(pScheme, rModelPart, mCurrentOutOfBalanceVector);
+        //    Timer::Stop("ApplyRHSConstraints");
+        //}
+
+        //this->AddMassAndDampingToRhs(rModelPart, mCurrentOutOfBalanceVector);
+
+        //// Does: rb = mCurrentOutOfBalanceVector - mPreviousOutOfBalanceVector;
+        //TSparseSpace::ScaleAndAdd(1.0, mCurrentOutOfBalanceVector, -1.0, mPreviousOutOfBalanceVector, rb);
+
+        //
+        ////mPreviousExternalForceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
 
         Timer::Stop("Build");
 
         TSystemVectorType dummy_b(rA.size1(), 0.0);
         TSystemVectorType dummy_rDx(rA.size1(), 0.0);
+        //this->InitializeSolutionStep(rModelPart, rA, dummy_rDx, dummy_b);
+        //TSparseSpace::Copy(mConstantElementForceVector, mCurrentExternalForceVector);
 
         // apply constraints
         if (!rModelPart.MasterSlaveConstraints().empty()) {
             const auto timer_constraints = BuiltinTimer();
             Timer::Start("ApplyConstraints");
-            BaseType::ApplyConstraints(pScheme, rModelPart, rA, rb);
+            BaseType::ApplyConstraints(pScheme, rModelPart, rA, dummy_b);
             BaseType::ApplyConstraints(pScheme, rModelPart, mMassMatrix, dummy_b);
             BaseType::ApplyConstraints(pScheme, rModelPart, mDampingMatrix, dummy_b);
             Timer::Stop("ApplyConstraints");
@@ -174,16 +199,21 @@ public:
                                                                                                                                 << std::endl;
 
         // apply dirichlet conditions
-        BaseType::ApplyDirichletConditions(pScheme, rModelPart, rA, dummy_rDx, rb);
+        BaseType::ApplyDirichletConditions(pScheme, rModelPart, rA, dummy_rDx, dummy_b);
 
         // mass matrix is considered a primary matrix as there is the posibility to invert this matrix
         BaseType::ApplyDirichletConditions(pScheme, rModelPart, mMassMatrix, dummy_rDx, dummy_b);
         Geo::SparseSystemUtilities::ApplyDirichletConditionsSecondaryMatrix(BaseType::mDofSet, mDampingMatrix);
 
         if (mCalculateInitialSecondDerivative) {
+            this->BuildRHSNoDirichlet(pScheme, rModelPart, rb);
+            this->ApplyDirichletConditionsRhs(rb);
+
             this->CalculateInitialSecondDerivative(rModelPart, rA, pScheme);
-            mCopyExternalForceVector = true;
         }
+       
+        // Calculate initial external force vector before adding dynamics to lhs
+        this->CalculateInitialExternalForceVector(rModelPart, rA);
 
         // only add dynamics to lhs after calculating initial second derivative
         this->AddDynamicsToLhs(rA, rModelPart);
@@ -259,7 +289,30 @@ public:
                           TSystemVectorType&            rb) override
     {
         KRATOS_TRY
+        
+
+        //if (!mIsInitialized) {
+            //mPreviousExternalForceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+            // copy external force vector if this is a restart
+            //if (rModelPart.GetProcessInfo()[STEP] > 1) {
+
+                //const std::string filename = "block_builder_and_solver_linear_elastic_dynamic_data.rest";
+
+              /*  if (std::filesystem::exists(filename)) {
+                    FileSerializer serializer(filename);
+                    this->load(serializer);
+                }
+                */
+
+
+                //TSparseSpace::Copy(mCurrentExternalForceVector, mPreviousExternalForceVector);
+            //}
+            //mIsInitialized = true;
+        //}
+        
+
         this->BuildRHS(pScheme, rModelPart, rb);
+        
 
         KRATOS_INFO_IF("ResidualBasedBlockBuilderAndSolverLinearElasticDynamic", BaseType::GetEchoLevel() >= 3)
             << "Before the solution of the system"
@@ -373,12 +426,22 @@ public:
         KRATOS_TRY
         BaseType::FinalizeSolutionStep(rModelPart, rA, rDx, rb);
 
-        // intitial copy should only happen if second derivative vector is calculated
-        if (mCopyExternalForceVector) {
-            TSparseSpace::Copy(mCurrentExternalForceVector, mPreviousExternalForceVector);
-        }
-        mCopyExternalForceVector = true;
+		TSparseSpace::Copy(mCurrentExternalForceVector, mPreviousExternalForceVector);
+
         KRATOS_CATCH("")
+    }
+
+    void Clear() override
+    {
+   //     {
+   //         //std::fstream file("block_builder_and_solver_linear_elastic_dynamic_data.rest",
+   //         //    std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
+
+   //         FileSerializer serializer("block_builder_and_solver_linear_elastic_dynamic_data.rest");
+			//this->save(serializer);
+   //     }
+
+        BaseType::Clear();
     }
 
     /**
@@ -435,8 +498,39 @@ private:
     double mBeta;
     double mGamma;
     bool   mCalculateInitialSecondDerivative;
-    bool   mCopyExternalForceVector = false;
     bool   mUsePerformSolutionStep  = false;
+	//bool   mIsInitialized = false;
+
+	/// <summary>
+	/// Calculates initial external force vector => F = Ku + Cv + Ma
+	/// </summary>
+	/// <param name="rModelPart"></param>
+	/// <param name="rA"></param>
+	void CalculateInitialExternalForceVector(ModelPart& rModelPart, TSystemMatrixType& rA)
+	{
+        TSystemVectorType u = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+        TSystemVectorType v = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+        TSystemVectorType a = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+
+        auto& r_dof_set = BaseType::GetDofSet();
+
+		// get u, v and a vectors from the model part
+        Geo::SparseSystemUtilities::GetTotalSolutionStepValueVector(u,
+            r_dof_set, rModelPart, 0);
+        Geo::SparseSystemUtilities::GetUFirstAndSecondDerivativeVector(
+            v, a, r_dof_set, rModelPart, 0);
+
+        TSystemVectorType Ku(rA.size1(), 0.0);
+        TSystemVectorType Cv(rA.size1(), 0.0);
+        TSystemVectorType Ma(rA.size1(), 0.0);
+
+        TSparseSpace::Mult(rA, u, Ku);
+        TSparseSpace::Mult(mDampingMatrix, v, Cv);
+        TSparseSpace::Mult(mMassMatrix, a, Ma);
+
+        mPreviousExternalForceVector = Ku + Cv + Ma;
+	}
+
 
     /// <summary>
     /// Builds the rhs only for the elements. Note that internal forces are not calculated in this function, only external forces such as gravity. This is done by setting the
@@ -715,6 +809,18 @@ private:
             }
         });
     }
+    //friend class Serializer;
+
+    //void save(Serializer& rSerializer) const
+    //{
+    //    rSerializer.save("PreviousExternalForceVector", mPreviousExternalForceVector);
+    //}
+
+    //void load(Serializer& rSerializer)
+    //{
+    //    rSerializer.load("PreviousExternalForceVector", mPreviousExternalForceVector);
+    //}
+
 
 }; /* Class ResidualBasedBlockBuilderAndSolverLinearElasticDynamic */
 
