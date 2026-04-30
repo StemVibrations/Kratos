@@ -43,7 +43,7 @@ namespace Kratos {
 
 namespace {
 
-constexpr std::string GetEndianness()
+std::string GetEndianness()
 {
     if constexpr(std::endian::native == std::endian::little) {
         return "LittleEndian";
