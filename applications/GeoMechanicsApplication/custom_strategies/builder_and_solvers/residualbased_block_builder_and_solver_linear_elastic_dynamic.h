@@ -133,15 +133,6 @@ public:
 
         mPreviousOutOfBalanceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
         mCurrentOutOfBalanceVector  = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
-
-        if (mPreviousExternalForceVector.empty()) {
-            // copy external force vector if this is a restart
-            if (rModelPart.GetProcessInfo()[STEP] > 1) {
-                TSparseSpace::Copy(mCurrentExternalForceVector, mPreviousExternalForceVector);
-            } else {
-                mPreviousExternalForceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
-            }
-        }
     }
 
     void Build(typename TSchemeType::Pointer pScheme, ModelPart& rModelPart, TSystemMatrixType& rA, TSystemVectorType& rb) override
@@ -151,7 +142,9 @@ public:
 
         this->BuildLHS(pScheme, rModelPart, rA);
         this->BuildRHSElementsNoDirichlet(pScheme, rModelPart);
-        this->BuildRHSNoDirichlet(pScheme, rModelPart, rb);
+
+        mCurrentExternalForceVector  = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+        mPreviousExternalForceVector = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
 
         Timer::Stop("Build");
 
@@ -162,7 +155,7 @@ public:
         if (!rModelPart.MasterSlaveConstraints().empty()) {
             const auto timer_constraints = BuiltinTimer();
             Timer::Start("ApplyConstraints");
-            BaseType::ApplyConstraints(pScheme, rModelPart, rA, rb);
+            BaseType::ApplyConstraints(pScheme, rModelPart, rA, dummy_b);
             BaseType::ApplyConstraints(pScheme, rModelPart, mMassMatrix, dummy_b);
             BaseType::ApplyConstraints(pScheme, rModelPart, mDampingMatrix, dummy_b);
             Timer::Stop("ApplyConstraints");
@@ -171,19 +164,24 @@ public:
         }
 
         KRATOS_ERROR_IF_NOT(Geo::SparseSystemUtilities::MatricesHaveSameDiagonalSignature(rA, mMassMatrix, BaseType::mDofSet)) << "The system matrix and the mass matrix do not have values on the same degrees of freedom, the builder and solver cannot be used in this case."
-                                                                                                                                << std::endl;
+                                                                                                                               << std::endl;
 
         // apply dirichlet conditions
-        BaseType::ApplyDirichletConditions(pScheme, rModelPart, rA, dummy_rDx, rb);
+        BaseType::ApplyDirichletConditions(pScheme, rModelPart, rA, dummy_rDx, dummy_b);
 
         // mass matrix is considered a primary matrix as there is the posibility to invert this matrix
         BaseType::ApplyDirichletConditions(pScheme, rModelPart, mMassMatrix, dummy_rDx, dummy_b);
         Geo::SparseSystemUtilities::ApplyDirichletConditionsSecondaryMatrix(BaseType::mDofSet, mDampingMatrix);
 
         if (mCalculateInitialSecondDerivative) {
+            this->BuildRHSNoDirichlet(pScheme, rModelPart, rb);
+            this->ApplyDirichletConditionsRhs(rb);
+
             this->CalculateInitialSecondDerivative(rModelPart, rA, pScheme);
-            mCopyExternalForceVector = true;
         }
+
+        // Calculate initial external force vector before adding dynamics to lhs
+        this->CalculateInitialExternalForceVector(rModelPart, rA);
 
         // only add dynamics to lhs after calculating initial second derivative
         this->AddDynamicsToLhs(rA, rModelPart);
@@ -259,6 +257,7 @@ public:
                           TSystemVectorType&            rb) override
     {
         KRATOS_TRY
+
         this->BuildRHS(pScheme, rModelPart, rb);
 
         KRATOS_INFO_IF("ResidualBasedBlockBuilderAndSolverLinearElasticDynamic", BaseType::GetEchoLevel() >= 3)
@@ -373,11 +372,8 @@ public:
         KRATOS_TRY
         BaseType::FinalizeSolutionStep(rModelPart, rA, rDx, rb);
 
-        // intitial copy should only happen if second derivative vector is calculated
-        if (mCopyExternalForceVector) {
-            TSparseSpace::Copy(mCurrentExternalForceVector, mPreviousExternalForceVector);
-        }
-        mCopyExternalForceVector = true;
+        TSparseSpace::Copy(mCurrentExternalForceVector, mPreviousExternalForceVector);
+
         KRATOS_CATCH("")
     }
 
@@ -435,8 +431,37 @@ private:
     double mBeta;
     double mGamma;
     bool   mCalculateInitialSecondDerivative;
-    bool   mCopyExternalForceVector = false;
-    bool   mUsePerformSolutionStep  = false;
+    bool   mUsePerformSolutionStep = false;
+
+    /// <summary>
+    /// Calculates initial external force vector => F = Ku + Cv + Ma
+    /// </summary>
+    /// <param name="rModelPart"></param>
+    /// <param name="rA"></param>
+    void CalculateInitialExternalForceVector(ModelPart& rModelPart, TSystemMatrixType& rA)
+    {
+        TSystemVectorType u = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+        TSystemVectorType v = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+        TSystemVectorType a = TSystemVectorType(BaseType::mEquationSystemSize, 0.0);
+
+        auto& r_dof_set = BaseType::GetDofSet();
+
+        // get u, v and a vectors from the model part
+        Geo::SparseSystemUtilities::GetTotalSolutionStepValueVector(u, r_dof_set, rModelPart, 0);
+        Geo::SparseSystemUtilities::GetUFirstAndSecondDerivativeVector(v, a, r_dof_set, rModelPart, 0);
+
+        TSystemVectorType Ku(rA.size1(), 0.0);
+        TSystemVectorType Cv(rA.size1(), 0.0);
+        TSystemVectorType Ma(rA.size1(), 0.0);
+
+        TSparseSpace::Mult(rA, u, Ku);             // K . u
+        TSparseSpace::Mult(mDampingMatrix, v, Cv); // C . v
+        TSparseSpace::Mult(mMassMatrix, a, Ma);    // M . a
+
+        // does: mPreviousExternalForceVector = Ku + Cv + Ma;
+        TSparseSpace::ScaleAndAdd(1.0, Ku, 1.0, Cv, mPreviousExternalForceVector);
+        TSparseSpace::UnaliasedAdd(mPreviousExternalForceVector, 1.0, Ma);
+    }
 
     /// <summary>
     /// Builds the rhs only for the elements. Note that internal forces are not calculated in this function, only external forces such as gravity. This is done by setting the

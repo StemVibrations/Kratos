@@ -259,7 +259,7 @@ template <class T>
 struct is_device_filter<T,
     typename std::enable_if<
             std::is_same<
-                bool, typename std::result_of<T(const backend::device&)>::type
+                bool, std::invoke_result_t<T, const backend::device&>
             >::value
         >::type
     > : std::true_type

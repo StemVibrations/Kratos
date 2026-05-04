@@ -293,29 +293,32 @@ void SetMovingLoadProcess::InitializeDistanceLoadInSortedVector()
 void SetMovingLoadProcess::ExecuteInitialize()
 {
     KRATOS_TRY
+
+    // clear load functions vector
+    mLoadFunctions.clear();
+
+    // check if load input is a function or numeric and add load to member variable
+    if (mParameters["load"][0].IsString()) {
+        mUseLoadFunction = true;
+        for (IndexType i = 0; i < mParameters["load"].size(); ++i) {
+            BasicGenericFunctionUtility load_function = BasicGenericFunctionUtility(mParameters["load"][i].GetString());
+            mLoadFunctions.push_back(load_function);
+        }
+    }
+    else {
+        mUseLoadFunction = false;
+    }
+
+    // check if velocity input is a function or numeric and add velocity to member variable
+    if (mParameters["velocity"].IsString()) {
+        mUseVelocityFunction = true;
+    }
+    else {
+        mUseVelocityFunction = false;
+    }
+
+
     if (!this->mrModelPart.GetProcessInfo()[IS_RESTARTED]){
-        // clear load functions vector
-        mLoadFunctions.clear();
-
-        // check if load input is a function or numeric and add load to member variable
-        if (mParameters["load"][0].IsString()) {
-            mUseLoadFunction = true;
-            for (IndexType i = 0; i < mParameters["load"].size(); ++i) {
-                BasicGenericFunctionUtility load_function = BasicGenericFunctionUtility(mParameters["load"][i].GetString());
-                mLoadFunctions.push_back(load_function);
-            }
-        }
-        else {
-            mUseLoadFunction = false;
-        }
-
-        // check if velocity input is a function or numeric and add velocity to member variable
-        if (mParameters["velocity"].IsString()) {
-            mUseVelocityFunction = true;
-        }
-        else {
-            mUseVelocityFunction = false;
-        }
 
         array_1d<int, 3> direction;
 
@@ -427,8 +430,6 @@ void SetMovingLoadProcess::save(Serializer& rSerializer) const
     KRATOS_SERIALIZE_SAVE_BASE_CLASS(rSerializer, Process);
     rSerializer.save("SortedConditionsIds", mSortedConditionsIds);
     rSerializer.save("IsCondReversedVector", mIsCondReversedVector);
-    rSerializer.save("UseLoadFunction", mUseLoadFunction);
-    rSerializer.save("UseVelocityFunction", mUseVelocityFunction);
     rSerializer.save("CurrentDistance", mCurrentDistance);
 
 }
@@ -438,8 +439,6 @@ void SetMovingLoadProcess::load(Serializer& rSerializer)
     KRATOS_SERIALIZE_LOAD_BASE_CLASS(rSerializer, Process);
     rSerializer.load("SortedConditionsIds", mSortedConditionsIds);
     rSerializer.load("IsCondReversedVector", mIsCondReversedVector);
-    rSerializer.load("UseLoadFunction", mUseLoadFunction);
-    rSerializer.load("UseVelocityFunction", mUseVelocityFunction);
     rSerializer.load("CurrentDistance", mCurrentDistance);
 }
 
