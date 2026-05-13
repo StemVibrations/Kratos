@@ -746,8 +746,6 @@ class ResidualBasedNewtonRaphsonStrategyTwo
             SparseSpaceType::Clear(mpDx);
         if (mpb != nullptr)
             SparseSpaceType::Clear(mpb);
-		if (mpPreviousA != nullptr)
-			SparseSpaceType::Clear(mpPreviousA);
 
 		std::cout << "Clearing system of equations..." << std::endl;
         // Clearing scheme
@@ -859,12 +857,6 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                 mPreviousExternalForceVector.resize(mpb->size(), false);
                 TSparseSpace::SetToZero(mPreviousExternalForceVector);
 
-                p_builder_and_solver->ResizeAndInitializeVectors(p_scheme, mpPreviousA, mpDx, mpb,
-                    r_model_part);
-
-                mPreviousA = *mpPreviousA;
-
-				//SparseSpaceType::Copy(*mpA, mPreviousA);
             }
 
 
@@ -1018,7 +1010,6 @@ class ResidualBasedNewtonRaphsonStrategyTwo
         Element::EquationIdVectorType EquationId;
 
         // assemble all elements
-        //for (typename ElementsArrayType::ptr_iterator it = pElements.ptr_begin(); it != pElements.ptr_end(); ++it)
 
         const int nelements = static_cast<int>(pElements.size());
 #pragma omp parallel firstprivate(nelements, RHS_Contribution, EquationId)
@@ -1108,39 +1099,13 @@ class ResidualBasedNewtonRaphsonStrategyTwo
 
     }
 
-	//int GetNumberOfInaccuratePlasticPoints(ModelPart& rModelpart) override
-	//{
- //       ElementsArrayType& rElements = rModelPart.Elements();
-
-	//	for (auto& r_element : rElements) {
-	//		auto& r_properties = r_element.GetProperties();
- //           r_properties.
-
- //           
-
-	//		if (r_element.Is(STRUCTURE) && r_element.Is(PLASTIC)) {
-	//			if (r_element.GetValue(INACCURATE_PLASTIC_POINT)) {
-	//				rModelpart.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] += 1;
-	//			}
-	//		}
-	//	}
-
-	//	return BaseType::GetModelPart().GetProcessInfo()[INACCURATE_PLASTIC_POINTS];
-	//}
-
 
     /**
      * @brief Solves the current step. This function returns true if a solution has been found, false otherwise.
      */
     bool SolveSolutionStep() override
     {
-		std::cout << "debug point 1" << std::endl;
-        int current_damping_step = 1;
-        int n_damping_steps = 2;
-		//double damping_factor = 1.0/ n_damping_steps;
-        //double damping_factor = 0.75;
         double damping_factor = 1.0;
-		double factor_calculated = 0.0;
         // Pointers needed in the solution
         ModelPart& r_model_part = BaseType::GetModelPart();
         typename TSchemeType::Pointer p_scheme = GetScheme();
@@ -1158,7 +1123,6 @@ class ResidualBasedNewtonRaphsonStrategyTwo
         TSystemVectorType& rDx = *mpDx;
         TSystemVectorType& rb  = *mpb;
 
-		std::cout << "debug point 2" << std::endl;
         //initializing the parameters of the Newton-Raphson cycle
         unsigned int iteration_number = 1;
         r_model_part.GetProcessInfo()[NL_ITERATION_NUMBER] = iteration_number;
@@ -1170,7 +1134,6 @@ class ResidualBasedNewtonRaphsonStrategyTwo
 		mIniExternalForceVector.resize(rb.size(), false);
         TSparseSpace::SetToZero(mIniExternalForceVector);
 
-		std::cout << "debug point 3" << std::endl;
 		BuildExternalForceVector(r_model_part, mIniExternalForceVector);
 
 		mIniFNorm = TSparseSpace::TwoNorm(mIniExternalForceVector);
@@ -1180,19 +1143,6 @@ class ResidualBasedNewtonRaphsonStrategyTwo
         double rel_tol = 1e-2;
         bool is_converged = true;
 		int max_inaccurate_plastic_points = 0;
-
-		
-  //      if (r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] > max_inaccurate_plastic_points)
-		//{
-		//	is_converged = false;
-		//	std::cout << "Warning: number of inaccurate plastic points: " << r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << std::endl;
-		//}
-
-		//bool is_converged = rb_norm / mIniFNorm < rel_tol || rb_norm < abs_tol;
-
-		//std::cout << "rb_norm: " << rb_norm << "; IniFNorm: " << mIniFNorm << "; rel_tol: " << rel_tol << "; abs_tol: " << abs_tol << "; is_converged: " << is_converged << std::endl;
-
-
 
         //mpConvergenceCriteria->InitializeNonLinearIteration(r_model_part, r_dof_set, rA, rDx, rb);
         //bool is_converged = mpConvergenceCriteria->PreCriteria(r_model_part, r_dof_set, rA, rDx, rb);
@@ -1207,107 +1157,30 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                 p_builder_and_solver->BuildAndSolveLinearizedOnPreviousIteration(p_scheme, r_model_part, rA, rDx, rb,BaseType::MoveMeshFlag());
             } else {
 
-                double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
-				std::cout << "load_fraction: " << load_fraction << std::endl;
-                TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
-				TSystemVectorType int_force = ZeroVector(rb.size());
-
                 p_builder_and_solver->BuildLHS(p_scheme, r_model_part, rA);
-
-                max_inaccurate_plastic_points = rel_tol * r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] + 3;
-
-                if (r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] > max_inaccurate_plastic_points)
-                {
-                    is_converged = false;
-					std::cout << "Warning: number of inaccurate plastic points: " << r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << ", max allowed: " << max_inaccurate_plastic_points << std::endl;
-                    return is_converged;
+                if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
+                    return false;
                 }
-
-
-				BuildInternalForceVector(r_model_part, int_force);
-
-                TSystemVectorType ini_int_force = ZeroVector(rb.size());
-                TSparseSpace::Copy(mPreviousExternalForceVector, ini_int_force);
-
-                TSystemVectorType d_int_force = int_force - ini_int_force;
-
-
-                // norm int force
-                double int_force_norm = TSparseSpace::TwoNorm(int_force);
-                std::cout << "int_force_norm: " << int_force_norm << std::endl;
-
-                rb = load_fraction * (d_ext_force - d_int_force);//  +mPreviousExternalForceVector - int_force;
-                //rb = load_fraction * d_ext_force + mPreviousExternalForceVector - int_force;
-				//rb = mIniExternalForceVector - int_force;
-                // 
-    //            // norm int force
-				//double int_force_norm = TSparseSpace::TwoNorm(int_force);
-				//std::cout << "int_force_norm: " << int_force_norm << std::endl;
-    //            
-    //            rb = load_fraction * d_ext_force + mPreviousExternalForceVector - int_force;
-				////rb = load_fraction * mIniExternalForceVector + (1.0 - load_fraction) * mPreviousExternalForceVector - int_force;
-
+                this->BuildRHS(r_model_part, r_dof_set, rb);
                 
-
                 p_builder_and_solver->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
-
-                /*double* rA_values = rA.value_data().begin();
-                double* prev_values = mPreviousA.value_data().begin();
-
-                const std::size_t nnz = rA.nnz();
-
-                for (std::size_t k = 0; k < nnz; ++k)
-                {
-                    rA_values[k] =
-                        prev_values[k] +
-                        load_fraction * (rA_values[k] - prev_values[k]);
-                }*/
-
                 std::cout << "rb_norm: " << TSparseSpace::TwoNorm(rb) << " prev_force_vector_norm: " << TSparseSpace::TwoNorm(mPreviousExternalForceVector) << " ini_force_vector_norm: " << TSparseSpace::TwoNorm(mIniExternalForceVector) << std::endl;
 
                 auto p_linear_solver = p_builder_and_solver->GetLinearSystemSolver();
                 p_linear_solver->InitializeSolutionStep(rA, rDx, rb);
                 p_linear_solver->PerformSolutionStep(rA, rDx, rb);
                 //p_linear_solver->FinalizeSolutionStep(rA, rDx, rb);
-                //p_linear_solver->
-
                 //p_builder_and_solver->SystemSolve(rA, rDx, rb);
-
-                //p_builder_and_solver->BuildAndSolve(p_scheme, r_model_part, rA, rDx, rb);
             }
         } else {
             TSparseSpace::SetToZero(rDx);  // Dx = 0.00;
             TSparseSpace::SetToZero(rb);
 
-            double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
-            std::cout << "load_fraction: " << load_fraction << std::endl;
-            TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
-            TSystemVectorType int_force = ZeroVector(rb.size());
 
-            BuildInternalForceVector(r_model_part, int_force);
-
-            max_inaccurate_plastic_points = rel_tol * r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] + 3;
-
-            if (r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] > max_inaccurate_plastic_points)
-            {
-                is_converged = false;
-                std::cout << "Warning: number of inaccurate plastic points: " << r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << ", max allowed: " << max_inaccurate_plastic_points << std::endl;
-                return is_converged;
+            this->BuildRHS(r_model_part, r_dof_set, rb);
+            if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
+                return false;
             }
-
-            TSystemVectorType ini_int_force = ZeroVector(rb.size());
-            TSparseSpace::Copy(mPreviousExternalForceVector, ini_int_force);
-
-            TSystemVectorType d_int_force = int_force - ini_int_force;
-
-
-            // norm int force
-            double int_force_norm = TSparseSpace::TwoNorm(int_force);
-            std::cout << "int_force_norm: " << int_force_norm << std::endl;
-
-            rb = load_fraction * (d_ext_force - d_int_force);//  +mPreviousExternalForceVector - int_force;
-
-            p_builder_and_solver->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
 
             auto p_linear_solver = p_builder_and_solver->GetLinearSystemSolver();
             p_linear_solver->PerformSolutionStep(rA, rDx, rb);
@@ -1396,120 +1269,40 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                 {
                     if (GetKeepSystemConstantDuringIterations() == false)
                     {
-						std::cout << "Rebuilding system at iteration " << iteration_number << std::endl;
                         const auto timer = BuiltinTimer();
 
                         TSparseSpace::SetToZero(rA);
                         TSparseSpace::SetToZero(rDx);
                         TSparseSpace::SetToZero(rb);
 
-                        double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
-
-                        TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
-                        TSystemVectorType int_force = ZeroVector(rb.size());
-
 						std::cout << "Building LHS at iteration " << iteration_number << std::endl;
                         p_builder_and_solver->BuildLHS(p_scheme, r_model_part, rA);
-
-                        max_inaccurate_plastic_points = rel_tol * r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] + 3;
-
-                        if (r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] > max_inaccurate_plastic_points)
-                        {
-                            is_converged = false;
-                            std::cout << "Warning: number of inaccurate plastic points: " << r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << ", max allowed: " << max_inaccurate_plastic_points << std::endl;
-                            return is_converged;
+                        if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
+                            return false;
                         }
 
-                        double lhs_time = timer.ElapsedSeconds();
-                        KRATOS_INFO_IF("newton_raphson", this->GetEchoLevel() >= 1) << "LHS time: " << lhs_time << std::endl;
-                        BuildInternalForceVector(r_model_part, int_force);
-                        
-                        double int_force_time = timer.ElapsedSeconds();
-                        KRATOS_INFO_IF("newton_raphson", this->GetEchoLevel() >= 1) << "Internal force time: " << int_force_time - lhs_time << std::endl;
+                        this->BuildRHS(r_model_part, r_dof_set, rb);
 
-                        TSystemVectorType ini_int_force = ZeroVector(rb.size());
-                        TSparseSpace::Copy(mPreviousExternalForceVector, ini_int_force);
-
-                        TSystemVectorType d_int_force = int_force - ini_int_force;
-
-
-                        // norm int force
-                        double int_force_norm = TSparseSpace::TwoNorm(int_force);
-                        std::cout << "int_force_norm: " << int_force_norm << std::endl;
-
-                        rb = load_fraction * (d_ext_force - d_int_force);//  +mPreviousExternalForceVector - int_force;
-                        //rb = load_fraction * d_ext_force + mPreviousExternalForceVector - int_force;
-                        //rb = mIniExternalForceVector - int_force;
-
-						//rb = load_fraction * d_ext_force + mPreviousExternalForceVector - int_force;
-                        //rb = load_fraction * mIniExternalForceVector + (1.0 - load_fraction) * mPreviousExternalForceVector - int_force;
-                        //A = 0.00;
-
-						//p_builder_and_solver->Build(p_scheme, r_model_part, rA, rb);
                         p_builder_and_solver->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
 
-                        //double* rA_values = rA.value_data().begin();
-                        //double* prev_values = mPreviousA.value_data().begin();
-
-                        //const std::size_t nnz = rA.nnz();
-
-                        //for (std::size_t k = 0; k < nnz; ++k)
-                        //{
-                        //    rA_values[k] =
-                        //        prev_values[k] +
-                        //        load_fraction * (rA_values[k] - prev_values[k]);
-                        //}
-
-						double some_processes_time = timer.ElapsedSeconds();
-                        KRATOS_INFO_IF("newton_raphson", this->GetEchoLevel() >= 1) << "Some_processes: " << some_processes_time - int_force_time << std::endl;
 						std::cout << "rb_norm: " << TSparseSpace::TwoNorm(rb) << " prev_force_vector_norm: " << TSparseSpace::TwoNorm(mPreviousExternalForceVector) << " ini_force_vector_norm: " << TSparseSpace::TwoNorm(mIniExternalForceVector) << std::endl;
-                        //p_builder_and_solver->SystemSolve(rA, rDx, rb);
 
                         auto p_linear_solver = p_builder_and_solver->GetLinearSystemSolver();
 						p_linear_solver->InitializeSolutionStep(rA, rDx, rb);
                         p_linear_solver->PerformSolutionStep(rA, rDx, rb);
 
-						double solve_time = timer.ElapsedSeconds();
-						KRATOS_INFO_IF("newton_raphson", this->GetEchoLevel() >= 1) << "Solve time: " << solve_time - some_processes_time << std::endl;
 
-                        //p_builder_and_solver->BuildAndSolve(p_scheme, r_model_part, rA, rDx, rb);
+
                     }
                     else
                     {
                         TSparseSpace::SetToZero(rDx);
                         TSparseSpace::SetToZero(rb);
 
-
-                        double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
-
-                        TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
-                        TSystemVectorType int_force = ZeroVector(rb.size());
-
-                        BuildInternalForceVector(r_model_part, int_force);
-
-                        max_inaccurate_plastic_points = rel_tol * r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] + 3;
-                        if (r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] > max_inaccurate_plastic_points)
-                        {
-                            is_converged = false;
-                            std::cout << "Warning: number of inaccurate plastic points: " << r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << ", max allowed: " << max_inaccurate_plastic_points << std::endl;
-                            return is_converged;
+                        this->BuildRHS(r_model_part, r_dof_set, rb);
+                        if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
+                            return false;
                         }
-
-                        TSystemVectorType ini_int_force = ZeroVector(rb.size());
-                        TSparseSpace::Copy(mPreviousExternalForceVector, ini_int_force);
-
-                        TSystemVectorType d_int_force = int_force - ini_int_force;
-
-
-                        // norm int force
-                        double int_force_norm = TSparseSpace::TwoNorm(int_force);
-                        std::cout << "int_force_norm build rhs: " << int_force_norm << std::endl;
-
-                        rb = load_fraction * (d_ext_force - d_int_force);//  +mPreviousExternalForceVector - int_force;
-                        //rb = load_fraction * d_ext_force + mPreviousExternalForceVector - int_force;
-                        //rb = mIniExternalForceVector - int_force;
-
-                        p_builder_and_solver->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
 
                         std::cout << "rb_norm: " << TSparseSpace::TwoNorm(rb) << " prev_force_vector_norm: " << TSparseSpace::TwoNorm(mPreviousExternalForceVector) << " ini_force_vector_norm: " << TSparseSpace::TwoNorm(mIniExternalForceVector) << std::endl;
 
@@ -1527,41 +1320,11 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                     TSparseSpace::SetToZero(rDx);
                     TSparseSpace::SetToZero(rb);
 
-
-                    double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
-
-                    TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
-                    TSystemVectorType int_force = ZeroVector(rb.size());
-
-                    BuildInternalForceVector(r_model_part, int_force);
-
-                    max_inaccurate_plastic_points = rel_tol * r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] + 3;
-
-					std::cout << "N plastic points: " << r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] << std::endl;
-
-                    if (r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] > max_inaccurate_plastic_points)
-                    {
-                        is_converged = false;
-                        std::cout << "Warning: number of inaccurate plastic points: " << r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << ", max allowed: " << max_inaccurate_plastic_points << std::endl;
-                        return is_converged;
+                    this->BuildRHS(r_model_part, r_dof_set, rb);
+                    if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
+                        return false;
                     }
-
-                    TSystemVectorType ini_int_force = ZeroVector(rb.size());
-                    TSparseSpace::Copy(mPreviousExternalForceVector, ini_int_force);
-
-                    TSystemVectorType d_int_force = int_force - ini_int_force;
-
-
-                    // norm int force
-                    double int_force_norm = TSparseSpace::TwoNorm(int_force);
-                    std::cout << "int_force_norm build rhs: " << int_force_norm << std::endl;
-
-                    rb = load_fraction * (d_ext_force - d_int_force);//  +mPreviousExternalForceVector - int_force;
-                    //rb = load_fraction * d_ext_force  +mPreviousExternalForceVector - int_force;
-                    //rb = mIniExternalForceVector - int_force;
-
-                    p_builder_and_solver->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
-
+                   
                     std::cout << "rb_norm: " << TSparseSpace::TwoNorm(rb) << " prev_force_vector_norm: " << TSparseSpace::TwoNorm(mPreviousExternalForceVector) << " ini_force_vector_norm: " << TSparseSpace::TwoNorm(mIniExternalForceVector) << std::endl;
 
                     auto p_linear_solver = p_builder_and_solver->GetLinearSystemSolver();
@@ -1569,7 +1332,6 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                     p_linear_solver->PerformSolutionStep(rA, rDx, rb);
                     //p_builder_and_solver->SystemSolve(rA, rDx, rb);
 
-                    //p_builder_and_solver->BuildRHSAndSolve(p_scheme, r_model_part, rA, rDx, rb);
                 }
             }
             else
@@ -1865,9 +1627,7 @@ class ResidualBasedNewtonRaphsonStrategyTwo
     TSystemVectorType mIniExternalForceVector;
     TSystemVectorType mPreviousExternalForceVector;
     TSystemMatrixPointerType mpA; /// The LHS matrix of the system of equations
-	TSystemMatrixType mPreviousA; /// The LHS matrix of the system of equations from the previous iteration, used when the flag mUseOldStiffnessInFirstIteration is set to true
-	TSystemMatrixPointerType mpPreviousA; /// The LHS matrix of the system of equations from the previous iteration, used when the flag mUseOldStiffnessInFirstIteration is set to true
-    
+   
     bool mReadForce = false; /// A flag to set if the force is read from file or not
 
 	double mIniFNorm; /// The initial residual norm, used for convergence criteria that require it
@@ -1911,7 +1671,57 @@ class ResidualBasedNewtonRaphsonStrategyTwo
      */
     bool mStoreNonconvergedSolutionsFlag = false;
 
+    bool LocalConvergenceAchieved(ProcessInfo& rProcessInfo, const double relative_tolerance)
+    {
+        double max_inaccurate_plastic_points = relative_tolerance * rProcessInfo[N_PLASTIC_POINTS] + 3;
 
+        if (rProcessInfo[INACCURATE_PLASTIC_POINTS] > max_inaccurate_plastic_points)
+        {
+            std::cout << "Warning: number of inaccurate plastic points: " << rProcessInfo[INACCURATE_PLASTIC_POINTS] << ", max allowed: " << max_inaccurate_plastic_points << std::endl;
+            return false;
+        }
+		return true;
+    }
+
+	void BuildRHS(
+		ModelPart& r_model_part,
+        DofsArrayType& r_dof_set,
+		TSystemVectorType& rb)
+	{
+        double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
+        
+        TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
+        
+        TSystemVectorType int_force = ZeroVector(rb.size());
+
+        // reset plastic points
+        r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] = 0;
+        r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] = 0;
+
+        BuildInternalForceVector(r_model_part, int_force);
+        
+        TSystemVectorType ini_int_force = ZeroVector(rb.size());
+
+		// initial internal force is equal to external force from previous step, as the system is in equilibrium at the beginning of the step
+        TSparseSpace::Copy(mPreviousExternalForceVector, ini_int_force);
+        TSystemVectorType d_int_force = int_force - ini_int_force;
+
+        // norm int force
+        //double int_force_norm = TSparseSpace::TwoNorm(int_force);
+        //std::cout << "int_force_norm: " << int_force_norm << std::endl;
+
+		// load fraction * (d_Fext - d_Fint) + Fext_prev - Fint_prev
+        rb = load_fraction * (d_ext_force - d_int_force);
+
+		// apply Dirichlet conditions RHS
+        //NOTE: dofs are assumed to be numbered consecutively
+        block_for_each(r_dof_set, [&](Dof<double>& rDof) {
+            const std::size_t i = rDof.EquationId();
+
+            if (rDof.IsFixed())
+                rb[i] = 0.0;
+            });
+	}
 
     ///@}
     ///@name Private Operators
@@ -2037,95 +1847,12 @@ class ResidualBasedNewtonRaphsonStrategyTwo
 
     void save(FileSerializer& rSerializer) const
     {
-		//std::cout << "save called" << std::endl;
-  //      if (mpA != nullptr) {
-
-  //          TSystemMatrixType& rA = *mpA;
-
-  //          const int nnz = rA.nnz();
-  //          const int size1 = rA.size1();
-  //          const int size2 = rA.size2();
-
-  //          std::vector<double> values(nnz);
-  //          std::vector<std::size_t> row_indices(size1 + 1);
-  //          std::vector<std::size_t> col_indices(nnz);
-
-  //          std::copy(
-  //              rA.value_data().begin(),
-  //              rA.value_data().begin() + nnz,
-  //              values.begin());
-
-  //          std::copy(
-  //              rA.index1_data().begin(),
-  //              rA.index1_data().begin() + size1 + 1,
-  //              row_indices.begin());
-
-  //          std::copy(
-  //              rA.index2_data().begin(),
-  //              rA.index2_data().begin() + nnz,
-  //              col_indices.begin());
-  //          std::cout << "Saving PreviousExternalForceVector with size: " << mIniExternalForceVector.size() << std::endl;
-            rSerializer.save("PreviousExternalForceVector", mIniExternalForceVector);
-  //          std::cout << "Saving PreviousSystemMatrix with size: " << size1 << "x" << size2 << " and nnz: " << nnz << std::endl;
-  //          rSerializer.save("PreviousSystemMatrix_nnz", nnz);
-  //          rSerializer.save("PreviousSystemMatrix_size1", size1);
-  //          rSerializer.save("PreviousSystemMatrix_size2", size2);
-  //          std::cout << "Saving PreviousSystemMatrix values with size: " << values.size() << std::endl;
-  //          rSerializer.save("PreviousSystemMatrix_values", values);
-  //          std::cout << "Saving PreviousSystemMatrix row indices with size: " << row_indices.size() << std::endl;
-  //          rSerializer.save("PreviousSystemMatrix_row_indices", row_indices);
-  //          std::cout << "Saving PreviousSystemMatrix col indices with size: " << col_indices.size() << std::endl;
-  //          rSerializer.save("PreviousSystemMatrix_col_indices", col_indices);
-  //      }
-
+        rSerializer.save("PreviousExternalForceVector", mIniExternalForceVector);
     }
 
     void load(FileSerializer& rSerializer)
     {
-        //int nnz, size1, size2;
-
-        //std::vector<double> values;
-        //std::vector<std::size_t> row_indices;
-        //std::vector<std::size_t> col_indices;
-
         rSerializer.load("PreviousExternalForceVector", mPreviousExternalForceVector);
-  //      rSerializer.load("PreviousSystemMatrix_nnz", nnz);
-  //      rSerializer.load("PreviousSystemMatrix_size1", size1);
-  //      rSerializer.load("PreviousSystemMatrix_size2", size2);
-
-  //      rSerializer.load("PreviousSystemMatrix_values", values);
-  //      rSerializer.load("PreviousSystemMatrix_row_indices", row_indices);
-  //      rSerializer.load("PreviousSystemMatrix_col_indices", col_indices);
-  //      
-		//rSerializer.load("PreviousSystemMatrix_nnz", nnz);
-		//rSerializer.load("PreviousSystemMatrix_size1", size1);
-		//rSerializer.load("PreviousSystemMatrix_size2", size2);
-
-        //mPreviousA = CompressedMatrixType(size1, size2, nnz);
-
-        //// Copy data back
-        //std::copy(
-        //    values.begin(),
-        //    values.end(),
-        //    mPreviousA.value_data().begin());
-
-        //std::copy(
-        //    row_indices.begin(),
-        //    row_indices.end(),
-        //    mPreviousA.index1_data().begin());
-
-        //std::copy(
-        //    col_indices.begin(),
-        //    col_indices.end(),
-        //    mPreviousA.index2_data().begin());
-
-        //// Important!
-        //mPreviousA.set_filled(size1 + 1, nnz);
-
-		
-
-
-		//rSerializer.load("PreviousSystemMatrix", mPreviousA);
     }
 
     ///@}
