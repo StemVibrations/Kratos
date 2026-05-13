@@ -567,6 +567,15 @@ public:
     {
         return 0;
     }
+
+    GeometriesArrayType GenerateFaces() const override
+    {
+        GeometriesArrayType faces = GeometriesArrayType();
+
+ 
+        return faces;
+    }
+
 	
 	    /// @copydoc Geometry::GenerateEdges
     GeometriesArrayType GenerateEdges() const override

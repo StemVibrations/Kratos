@@ -290,6 +290,72 @@ void NodalConcentratedElement::CalculateRightHandSide(VectorType& rRightHandSide
         rRightHandSideVector[j]  -= nodal_stiffness[j] * current_displacement[j];
 }
 
+
+void NodalConcentratedElement::CalculateInternalForces(VectorType& rRightHandSideVector,
+    const ProcessInfo& rProcessInfo) {
+    const unsigned int dimension = GetGeometry().WorkingSpaceDimension();
+
+    // Resizing as needed the RHS
+    const unsigned int system_size = dimension;
+
+    if (rRightHandSideVector.size() != system_size)
+        rRightHandSideVector.resize(system_size, false);
+
+    rRightHandSideVector = ZeroVector(system_size); //resetting RHS
+    const auto& r_displacement_variable = KratosComponents<Variable<array_1d<double, 3>>>::Get("TOTAL_DISPLACEMENT");
+    const array_1d<double, 3 >& current_displacement = GetGeometry()[0].FastGetSolutionStepValue(r_displacement_variable);
+
+
+    // We get the reference
+    const auto& rconst_this = *this;
+
+    // Compute and add internal forces
+    const array_1d<double, 3 >& nodal_stiffness = rconst_this.GetValue(NODAL_DISPLACEMENT_STIFFNESS);
+    for (unsigned int j = 0; j < dimension; ++j)
+        rRightHandSideVector[j] += nodal_stiffness[j] * current_displacement[j];
+
+}
+
+void NodalConcentratedElement::CalculateExternalForces(VectorType& rRightHandSideVector,
+    const ProcessInfo& rProcessInfo)
+{
+    const unsigned int dimension = GetGeometry().WorkingSpaceDimension();
+
+    // Resizing as needed the RHS
+    const unsigned int system_size = dimension;
+
+    if (rRightHandSideVector.size() != system_size)
+        rRightHandSideVector.resize(system_size, false);
+
+    rRightHandSideVector = ZeroVector(system_size); //resetting RHS
+    array_1d<double, 3 > volume_acceleration = ZeroVector(3);
+
+    if (GetGeometry()[0].SolutionStepsDataHas(VOLUME_ACCELERATION))
+        volume_acceleration = GetGeometry()[0].FastGetSolutionStepValue(VOLUME_ACCELERATION);
+
+    // We get the reference
+    const auto& rconst_this = *this;
+
+    // Compute and add external forces
+    const double nodal_mass = rconst_this.GetValue(NODAL_MASS);
+
+    for (unsigned int j = 0; j < dimension; ++j)
+        rRightHandSideVector[j] += volume_acceleration[j] * nodal_mass;
+}
+
+void NodalConcentratedElement::Calculate(const Variable<Vector>& rVariable, Vector& rOutput, const ProcessInfo& rCurrentProcessInfo)
+{
+    if (rVariable == INTERNAL_FORCES_VECTOR) {
+        CalculateInternalForces(rOutput, rCurrentProcessInfo);
+    }
+    else if (rVariable == EXTERNAL_FORCES_VECTOR) {
+        CalculateExternalForces(rOutput, rCurrentProcessInfo);
+    }
+    else {
+        KRATOS_ERROR << "Variable " << rVariable.Name() << " not supported in element " << this->Info() << std::endl;
+    }
+}
+
 //***********************************************************************************
 //***********************************************************************************
 

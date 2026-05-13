@@ -588,12 +588,32 @@ void SmallStrainUMATLaw<TVoigtSize>::CallUMAT(ConstitutiveLaw::Parameters& rValu
     // variable to check if an error happened in the model:
     const auto& MaterialParameters = rValues.GetMaterialProperties()[UMAT_PARAMETERS];
     auto        nProperties        = static_cast<int>(MaterialParameters.size());
+    std::mutex umat_mutex;
+    umat_mutex.lock();
     mpUserMod(&(mStressVector.data()[0]), &(mStateVariables.data()[0]), (double**)mMatrixD, &SSE,
               &SPD, &SCD, nullptr, nullptr, nullptr, nullptr, &(mStrainVectorFinalized.data()[0]),
               &(mDeltaStrainVector.data()[0]), &time, &deltaTime, nullptr, nullptr, nullptr,
               nullptr, &materialName, &ndi, &nshr, &ntens, &nStateVariables,
               &(MaterialParameters.data()[0]), &nProperties, nullptr, nullptr, nullptr, nullptr,
               nullptr, nullptr, &iElement, &integrationNumber, nullptr, nullptr, &iStep, &iteration);
+    umat_mutex.unlock();
+
+    auto& r_process_info =
+        const_cast<ProcessInfo&>(rValues.GetProcessInfo());
+    if (nStateVariables > 0) {
+		// get first value of state variables as a flag to check if the model has an error or not:
+        if (mStateVariables[0] < 0.0) {
+            #pragma omp atomic
+			r_process_info[INACCURATE_PLASTIC_POINTS] += 1;
+			std::cout << "Warning: UMAT model returned an error flag. Number of inaccurate plastic points: " << rValues.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << std::endl;
+        }
+        if (mStateVariables[0] >= 1.0)
+        {
+            #pragma omp atomic
+            r_process_info[N_PLASTIC_POINTS] += 1;
+        }
+
+    }
 
     KRATOS_CATCH("")
 }

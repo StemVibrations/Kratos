@@ -116,6 +116,8 @@ class GeoMechanicalSolver(PythonSolver):
             "prebuild_dynamics"          : false,
             "initialize_acceleration"    : false,
             "search_neighbours_step"     : false,
+            "use_old_stiffness_in_first_iteration" : false,
+            "read_force": false,
             "linear_solver_settings":{
                 "solver_type": "amgcl",
                 "tolerance": 1.0e-6,
@@ -257,6 +259,7 @@ class GeoMechanicalSolver(PythonSolver):
 
     def InitializeSolutionStep(self):
         self.solving_strategy.InitializeSolutionStep()
+        self.main_model_part.ProcessInfo[GeoMechanicsApplication.INACCURATE_PLASTIC_POINTS] = 0
 
     def Predict(self):
         self.solving_strategy.Predict()
@@ -468,6 +471,7 @@ class GeoMechanicalSolver(PythonSolver):
         compute_reactions = self.settings["compute_reactions"].GetBool()
         reform_step_dofs  = self.settings["reform_dofs_at_each_step"].GetBool()
         move_mesh_flag    = self.settings["move_mesh_flag"].GetBool()
+        read_force        = self.settings["read_force"].GetBool() if self.settings.Has("read_force") else False
 
         if strategy_type.lower() == "newton_raphson":
             self.strategy_params = KratosMultiphysics.Parameters("{}")
@@ -479,7 +483,8 @@ class GeoMechanicalSolver(PythonSolver):
                                                                                          max_iterations,
                                                                                          compute_reactions,
                                                                                          reform_step_dofs,
-                                                                                         move_mesh_flag)
+                                                                                         move_mesh_flag,
+                                                                                         read_force)
         elif strategy_type.lower() == "newton_raphson_linear_elastic":
 
             # check if the solver_type, solution_type and scheme_type are set to the correct values

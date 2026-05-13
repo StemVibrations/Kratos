@@ -17,6 +17,7 @@
 #include "includes/define.h"
 #include "includes/kratos_parameters.h"
 #include "includes/model_part.h"
+#include "custom_strategies/strategies/residualbased_newton_raphson_strategy_two.h"
 #include "solving_strategies/strategies/residualbased_newton_raphson_strategy.h"
 
 // Application includes
@@ -27,13 +28,13 @@ namespace Kratos
 
 template <class TSparseSpace, class TDenseSpace, class TLinearSolver>
 class GeoMechanicsNewtonRaphsonStrategy
-    : public ResidualBasedNewtonRaphsonStrategy<TSparseSpace, TDenseSpace, TLinearSolver>
+    : public ResidualBasedNewtonRaphsonStrategyTwo<TSparseSpace, TDenseSpace, TLinearSolver>
 {
 public:
     KRATOS_CLASS_POINTER_DEFINITION(GeoMechanicsNewtonRaphsonStrategy);
 
     using BaseType   = ImplicitSolvingStrategy<TSparseSpace, TDenseSpace, TLinearSolver>;
-    using MotherType = ResidualBasedNewtonRaphsonStrategy<TSparseSpace, TDenseSpace, TLinearSolver>;
+    using MotherType = ResidualBasedNewtonRaphsonStrategyTwo<TSparseSpace, TDenseSpace, TLinearSolver>;
     using TConvergenceCriteriaType = ConvergenceCriteria<TSparseSpace, TDenseSpace>;
     using TBuilderAndSolverType    = typename BaseType::TBuilderAndSolverType;
     using TSchemeType              = typename BaseType::TSchemeType;
@@ -66,11 +67,12 @@ public:
                                       int                                     MaxIterations = 30,
                                       bool CalculateReactions                               = false,
                                       bool ReformDofSetAtEachStep                           = false,
-                                      bool MoveMeshFlag                                     = false)
-        : ResidualBasedNewtonRaphsonStrategy<TSparseSpace, TDenseSpace, TLinearSolver>(
-              model_part, pScheme, pNewConvergenceCriteria, pNewBuilderAndSolver, MaxIterations, CalculateReactions, ReformDofSetAtEachStep, MoveMeshFlag)
+                                      bool MoveMeshFlag                                     = false,
+                                      bool ReadForce = false)
+        : ResidualBasedNewtonRaphsonStrategyTwo<TSparseSpace, TDenseSpace, TLinearSolver>(
+              model_part, pScheme, pNewConvergenceCriteria, pNewBuilderAndSolver, MaxIterations, CalculateReactions, ReformDofSetAtEachStep, MoveMeshFlag, ReadForce)
     {
-        // only include validation with c++11 since raw_literals do not exist in c++03
+        // only include validation with c++11 since raw_literals do not exist in c++03 
         Parameters default_parameters(R"(
                 {
                     "min_iteration":    2,
