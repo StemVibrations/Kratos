@@ -475,6 +475,8 @@ class GeoMechanicalSolver(PythonSolver):
 
         if strategy_type.lower() == "newton_raphson":
             self.strategy_params = KratosMultiphysics.Parameters("{}")
+            self.strategy_params.AddValue("iteration_method", self.settings["iteration_method"])
+            self.strategy_params.AddValue("broyden_settings", self.settings["broyden_settings"])
             solving_strategy = GeoMechanicsApplication.GeoMechanicsNewtonRaphsonStrategy(self.computing_model_part,
                                                                                          self.scheme,
                                                                                          self.convergence_criterion,

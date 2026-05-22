@@ -605,7 +605,7 @@ void SmallStrainUMATLaw<TVoigtSize>::CallUMAT(ConstitutiveLaw::Parameters& rValu
         if (mStateVariables[0] < 0.0) {
             #pragma omp atomic
 			r_process_info[INACCURATE_PLASTIC_POINTS] += 1;
-			std::cout << "Warning: UMAT model returned an error flag. Number of inaccurate plastic points: " << rValues.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << std::endl;
+			//std::cout << "Warning: UMAT model returned an error flag. Number of inaccurate plastic points: " << rValues.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << std::endl;
         }
         if (mStateVariables[0] >= 1.0)
         {

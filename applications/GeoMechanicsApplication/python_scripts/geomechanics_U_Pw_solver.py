@@ -68,6 +68,11 @@ class UPwSolver(GeoSolver):
             "reduction_factor"           : 0.5,
             "calculate_reactions"        : true,
             "max_line_search_iterations" : 5,
+            "iteration_method"             : "broyden",
+            "broyden_settings": {
+                "absolute_global_error": 1.0e-12,
+                "relative_global_error": 1.0e-3,
+                "relative_local_error": 1.0e-1},
             "first_alpha_value"          : 0.5,
             "second_alpha_value"         : 1.0,
             "min_alpha"                  : 0.1,

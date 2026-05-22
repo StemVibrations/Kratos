@@ -775,7 +775,7 @@ class ResidualBasedNewtonRaphsonStrategyTwo
         {
             ModelPart& r_model_part = BaseType::GetModelPart();
             TSparseSpace::SetToZero(rb);
-            double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
+            const double load_fraction = GetCurrentLoadFraction(r_model_part.GetProcessInfo());
             TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
             TSystemVectorType int_force = ZeroVector(rb.size());
             BuildInternalForceVector(r_model_part, int_force);
@@ -883,7 +883,7 @@ class ResidualBasedNewtonRaphsonStrategyTwo
             BuildExternalForceVector(r_model_part, mIniExternalForceVector);
 
             TSparseSpace::SetToZero(rb);
-            double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
+            double load_fraction = GetCurrentLoadFraction(r_model_part.GetProcessInfo());
             TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
             TSystemVectorType int_force = ZeroVector(rb.size());
             BuildInternalForceVector(r_model_part, int_force);
@@ -926,6 +926,13 @@ class ResidualBasedNewtonRaphsonStrategyTwo
         p_scheme->FinalizeSolutionStep(r_model_part, rA, rDx, rb);
         p_builder_and_solver->FinalizeSolutionStep(r_model_part, rA, rDx, rb);
         mpConvergenceCriteria->FinalizeSolutionStep(r_model_part, p_builder_and_solver->GetDofSet(), rA, rDx, rb);
+
+        // Arc-length: adapt arc-length and promote step state on success.
+        if (mUseArcLength && mLastStepConverged) {
+            AdaptArcLength();
+            OnArcLengthConverged();
+            mLastStepConverged = false;
+        }
 
         //Cleaning memory after the solution
         p_scheme->Clean();
@@ -1105,6 +1112,16 @@ class ResidualBasedNewtonRaphsonStrategyTwo
      */
     bool SolveSolutionStep() override
     {
+        // Arc-length dispatch: when enabled, run Crisfield arc-length driver instead of plain Newton-Raphson.
+        if (mUseArcLength) {
+            return SolveArcLengthSolutionStep();
+        }
+        // Broyden / Woodbury quasi-Newton dispatch: K0 is factored once per step and reused
+        // with rank-1 Broyden updates applied via the Sherman-Morrison-Woodbury identity.
+        if (mUseBroyden) {
+            return SolveBroydenSolutionStep();
+        }
+
         double damping_factor = 1.0;
         // Pointers needed in the solution
         ModelPart& r_model_part = BaseType::GetModelPart();
@@ -1143,7 +1160,7 @@ class ResidualBasedNewtonRaphsonStrategyTwo
         double rel_tol = 1e-2;
         bool is_converged = true;
 		int max_inaccurate_plastic_points = 0;
-
+        double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
         //mpConvergenceCriteria->InitializeNonLinearIteration(r_model_part, r_dof_set, rA, rDx, rb);
         //bool is_converged = mpConvergenceCriteria->PreCriteria(r_model_part, r_dof_set, rA, rDx, rb);
 
@@ -1161,6 +1178,10 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                 if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
                     return false;
                 }
+                r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] = 0;
+                r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] = 0;
+				//p_builder_and_solver->BuildRHS(p_scheme, r_model_part, rb);
+                //rb = load_fraction * rb;
                 this->BuildRHS(r_model_part, r_dof_set, rb);
                 
                 p_builder_and_solver->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
@@ -1176,7 +1197,8 @@ class ResidualBasedNewtonRaphsonStrategyTwo
             TSparseSpace::SetToZero(rDx);  // Dx = 0.00;
             TSparseSpace::SetToZero(rb);
 
-
+            //p_builder_and_solver->BuildRHS(p_scheme, r_model_part, rb);
+            //rb = load_fraction * rb;
             this->BuildRHS(r_model_part, r_dof_set, rb);
             if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
                 return false;
@@ -1280,7 +1302,10 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                         if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
                             return false;
                         }
-
+                        r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] = 0;
+                        r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] = 0;
+						//p_builder_and_solver->BuildRHS(p_scheme, r_model_part, rb);
+                        //rb = load_fraction * rb;
                         this->BuildRHS(r_model_part, r_dof_set, rb);
 
                         p_builder_and_solver->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
@@ -1300,6 +1325,8 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                         TSparseSpace::SetToZero(rb);
 
                         this->BuildRHS(r_model_part, r_dof_set, rb);
+						//p_builder_and_solver->BuildRHS(p_scheme, r_model_part, rb);
+                        //rb = load_fraction * rb;
                         if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
                             return false;
                         }
@@ -1320,6 +1347,8 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                     TSparseSpace::SetToZero(rDx);
                     TSparseSpace::SetToZero(rb);
 
+                    //p_builder_and_solver->BuildRHS(p_scheme, r_model_part, rb);
+                    //rb = load_fraction * rb;
                     this->BuildRHS(r_model_part, r_dof_set, rb);
                     if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol)) {
                         return false;
@@ -1364,6 +1393,7 @@ class ResidualBasedNewtonRaphsonStrategyTwo
     //            if (mpConvergenceCriteria->GetActualizeRHSflag() == true)
     //            {
     //                TSparseSpace::SetToZero(rb);
+
 
     //                double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
     //                TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
@@ -1464,6 +1494,17 @@ class ResidualBasedNewtonRaphsonStrategyTwo
             "max_iteration"                       : 10,
             "reform_dofs_at_each_step"            : false,
             "compute_reactions"                   : false,
+            "use_arc_length"                      : false,
+            "use_broyden"                         : false,
+            "arc_length_settings"                 : {
+                "initial_arc_length"        : 0.0,
+                "max_arc_length_factor"     : 10.0,
+                "min_arc_length_factor"     : 0.1,
+                "desired_iterations"        : 4,
+                "beta"                      : 0.0,
+                "max_load_factor"           : 1.0,
+                "max_arc_length_reductions" : 5
+            },
             "builder_and_solver_settings"         : {},
             "convergence_criteria_settings"       : {},
             "linear_solver_settings"              : {},
@@ -1539,6 +1580,66 @@ class ResidualBasedNewtonRaphsonStrategyTwo
     {
         mKeepSystemConstantDuringIterations = Value;
     }
+
+    /**
+     * @brief Enable / disable arc-length control (Crisfield's spherical/cylindrical method).
+     *        When enabled, SolveSolutionStep() dispatches to the arc-length driver and
+     *        the externally-supplied load fraction (derived from TIME) is replaced by the
+     *        internal load factor lambda controlled by the arc-length constraint.
+     */
+    void SetUseArcLength(bool Value) { mUseArcLength = Value; }
+    bool GetUseArcLength() const     { return mUseArcLength; }
+
+    /**
+     * @brief Enable / disable the Broyden + Woodbury quasi-Newton solver.
+     *        When enabled, the tangent K0 is built and factored only ONCE per solution step
+     *        (via p_linear_solver->InitializeSolutionStep), and subsequent iterations reuse
+     *        that factorization (p_linear_solver->PerformSolutionStep) together with rank-1
+     *        Broyden updates resolved through the Sherman-Morrison-Woodbury identity.
+     */
+    void SetUseBroyden(bool Value) { mUseBroyden = Value; }
+    bool GetUseBroyden() const     { return mUseBroyden; }
+
+    void SetBroydenSettings(
+        double AbsoluteGlobalError,
+        double RelativeGlobalError,
+        double RelativeLocalError)
+    {
+		mMaxGlobalAbsoluteError = AbsoluteGlobalError;
+		mMaxGlobalRelativeError = RelativeGlobalError;
+		mMaxLocalRelativeError = RelativeLocalError;
+    }
+
+    /**
+     * @brief Configure arc-length parameters at runtime.
+     * @param InitialArcLength       Reference arc-length. If <= 0, it is auto-computed from the first predictor.
+     * @param MaxArcLengthFactor     Upper bound multiplier: max radius = factor * InitialArcLength.
+     * @param MinArcLengthFactor     Lower bound multiplier: min radius = factor * InitialArcLength.
+     * @param DesiredIterations      Target iteration count used for arc-length adaptation.
+     * @param Beta                   0 = cylindrical, 1 = spherical, in-between for mixed.
+     * @param MaxLoadFactor          Termination cap for the cumulative load factor lambda.
+     * @param MaxArcLengthReductions Max retries (halvings) when the constraint quadratic has no real root.
+     */
+    void SetArcLengthSettings(double InitialArcLength,
+                              double MaxArcLengthFactor   = 10.0,
+                              double MinArcLengthFactor   = 0.1,
+                              unsigned int DesiredIterations = 4,
+                              double Beta                 = 0.0,
+                              double MaxLoadFactor        = 1.0,
+                              unsigned int MaxArcLengthReductions = 5)
+    {
+        mArcLength0             = InitialArcLength;
+        mArcLength              = InitialArcLength;
+        mMaxArcLengthFactor     = MaxArcLengthFactor;
+        mMinArcLengthFactor     = MinArcLengthFactor;
+        mDesiredIterations      = DesiredIterations;
+        mBeta                   = Beta;
+        mLambdaMax              = MaxLoadFactor;
+        mMaxArcLengthReductions = MaxArcLengthReductions;
+    }
+
+    /// Returns the current converged load factor (only meaningful when arc-length is enabled).
+    double GetArcLengthLambda() const { return mLambda; }
 
     /**
      * @brief Get method for the flag mKeepSystemConstantDuringIterations
@@ -1632,6 +1733,30 @@ class ResidualBasedNewtonRaphsonStrategyTwo
 
 	double mIniFNorm; /// The initial residual norm, used for convergence criteria that require it
 
+    // ===== Arc-length (Crisfield) state =====
+    bool   mUseArcLength            = false;  ///< If true, SolveSolutionStep uses arc-length control
+    double mBeta                    = 0.0;    ///< 0 = cylindrical, 1 = spherical
+    double mArcLength               = 0.0;    ///< Current arc-length radius
+    double mArcLength0              = 0.0;    ///< Reference arc-length (computed from first predictor if <= 0)
+    double mMaxArcLengthFactor      = 10.0;   ///< Upper bound: mArcLength <= mMaxArcLengthFactor * mArcLength0
+    double mMinArcLengthFactor      = 0.1;    ///< Lower bound: mArcLength >= mMinArcLengthFactor * mArcLength0
+    unsigned int mDesiredIterations = 4;      ///< Target iterations per step for arc-length adaptation
+    double mLambda                  = 0.0;    ///< Converged load factor at the start of the current step
+    double mDeltaLambda             = 0.0;    ///< Load-factor increment for the current step
+    double mLambdaMax               = 1.0;    ///< Cap on (mLambda + mDeltaLambda)
+    unsigned int mMaxArcLengthReductions = 5; ///< Max number of arc-length halvings on snap-back failure
+    int    mPredictorSignHint       = 1;      ///< Sign hint for predictor (carried between steps)
+    TSystemVectorType mDeltaU;                ///< Accumulated displacement increment over the current step
+    TSystemVectorType mQ;                     ///< Reference load vector for the step (= mIniExternalForceVector - mPreviousExternalForceVector)
+    bool   mLastStepConverged       = false;  ///< Set in SolveSolutionStep / used in FinalizeSolutionStep for adaptation
+    unsigned int mLastStepIterations = 1;     ///< Iteration count of the last converged arc-length step
+
+    // ===== Broyden / Woodbury quasi-Newton state =====
+    bool mUseBroyden = true; ///< If true, SolveSolutionStep uses the Broyden + Woodbury solver
+    double mMaxGlobalAbsoluteError = 1e-12;
+    double mMaxGlobalRelativeError = 1e-3;
+    double mMaxLocalRelativeError = 1e-1;
+
     /**
      * @brief Flag telling if it is needed to reform the DofSet at each
     solution step or if it is possible to form it just once
@@ -1688,8 +1813,8 @@ class ResidualBasedNewtonRaphsonStrategyTwo
         DofsArrayType& r_dof_set,
 		TSystemVectorType& rb)
 	{
-        double load_fraction = (r_model_part.GetProcessInfo()[TIME] - r_model_part.GetProcessInfo()[START_TIME]) / (r_model_part.GetProcessInfo()[END_TIME] - r_model_part.GetProcessInfo()[START_TIME]);
-        
+        const double load_fraction = GetCurrentLoadFraction(r_model_part.GetProcessInfo());
+
         TSystemVectorType d_ext_force = mIniExternalForceVector - mPreviousExternalForceVector;
         
         TSystemVectorType int_force = ZeroVector(rb.size());
@@ -1704,14 +1829,20 @@ class ResidualBasedNewtonRaphsonStrategyTwo
 
 		// initial internal force is equal to external force from previous step, as the system is in equilibrium at the beginning of the step
         TSparseSpace::Copy(mPreviousExternalForceVector, ini_int_force);
-        TSystemVectorType d_int_force = int_force - ini_int_force;
+
+		TSystemVectorType d_int_force = ZeroVector(rb.size());
+		TSparseSpace::ScaleAndAdd(1.0, int_force, -1.0, ini_int_force, d_int_force); // ini_int_force = mPreviousExternalForceVector - int_force;
+        //TSystemVectorType d_int_force = int_force - ini_int_force;
 
         // norm int force
         //double int_force_norm = TSparseSpace::TwoNorm(int_force);
         //std::cout << "int_force_norm: " << int_force_norm << std::endl;
 
 		// load fraction * (d_Fext - d_Fint) + Fext_prev - Fint_prev
-        rb = load_fraction * (d_ext_force - d_int_force);
+		TSparseSpace::ScaleAndAdd(load_fraction, d_ext_force, -load_fraction, d_int_force, rb); //
+        //rb = load_fraction * (d_ext_force - d_int_force);
+		//rb = load_fraction * d_ext_force + mPreviousExternalForceVector - int_force;
+        //rb = (d_ext_force - d_int_force);
 
 		// apply Dirichlet conditions RHS
         //NOTE: dofs are assumed to be numbered consecutively
@@ -1722,6 +1853,652 @@ class ResidualBasedNewtonRaphsonStrategyTwo
                 rb[i] = 0.0;
             });
 	}
+
+    /**
+     * @brief Returns the active load fraction used to scale the external-load increment in BuildRHS.
+     *        - Standard mode: linear in time, (TIME - START_TIME) / (END_TIME - START_TIME).
+     *        - Arc-length mode: (mLambda + mDeltaLambda).
+     */
+    double GetCurrentLoadFraction(const ProcessInfo& rProcessInfo) const
+    {
+        if (mUseArcLength) {
+            return mLambda + mDeltaLambda;
+        }
+        const double t0 = rProcessInfo[START_TIME];
+        const double t1 = rProcessInfo[END_TIME];
+        const double t  = rProcessInfo[TIME];
+        const double dt = t1 - t0;
+        return (std::abs(dt) > 0.0) ? (t - t0) / dt : 1.0;
+    }
+
+    /**
+     * @brief Apply Dirichlet zeroing on a vector b in-place (used for predictor / corrector RHS).
+     */
+    void ZeroOutFixedDofs(DofsArrayType& r_dof_set, TSystemVectorType& rb)
+    {
+        block_for_each(r_dof_set, [&](Dof<double>& rDof) {
+            const std::size_t i = rDof.EquationId();
+            if (rDof.IsFixed())
+                rb[i] = 0.0;
+        });
+    }
+
+    /**
+     * @brief Top-level driver for one solution step using Crisfield arc-length control.
+     *        Mirrors the non-linear loop structure of SolveSolutionStep() but uses
+     *        the predictor / corrector defined below and adapts the load factor lambda.
+     */
+    bool SolveArcLengthSolutionStep()
+    {
+        KRATOS_TRY
+
+        ModelPart& r_model_part = BaseType::GetModelPart();
+        auto p_scheme           = GetScheme();
+        auto p_bs               = GetBuilderAndSolver();
+        auto& r_dof_set         = p_bs->GetDofSet();
+
+        TSystemMatrixType& rA  = *mpA;
+        TSystemVectorType& rDx = *mpDx;
+        TSystemVectorType& rb  = *mpb;
+
+        const double abs_tol = 1e-9;
+        const double rel_tol = 1e-2;
+		double local_converged = true;
+        double max_d_lambda = 1.0;
+
+        // Build the reference load vector q for this step (target Fext step increment).
+        mIniExternalForceVector.resize(rb.size(), false);
+        TSparseSpace::SetToZero(mIniExternalForceVector);
+        BuildExternalForceVector(r_model_part, mIniExternalForceVector);
+        mIniFNorm = TSparseSpace::TwoNorm(mIniExternalForceVector);
+
+        mQ.resize(rb.size(), false);
+        TSparseSpace::SetToZero(mQ);
+        noalias(mQ) = mIniExternalForceVector - mPreviousExternalForceVector;
+        const double q_norm = TSparseSpace::TwoNorm(mQ);
+
+        // Edge case: no load increment this step -> degrade to plain Newton-Raphson.
+        if (q_norm < std::numeric_limits<double>::epsilon()) {
+            KRATOS_WARNING("ResidualBasedNewtonRaphsonStrategyTwo")
+                << "Arc-length: ||q||=0 for this step, falling back to load-control Newton-Raphson." << std::endl;
+            const bool saved = mUseArcLength;
+            mUseArcLength = false;
+            const bool ok = this->SolveSolutionStep();
+            mUseArcLength = saved;
+            return ok;
+        }
+
+        // Reset step-local state and allocate Δu.
+        mDeltaLambda = 0.0;
+        mDeltaU.resize(rb.size(), false);
+        TSparseSpace::SetToZero(mDeltaU);
+
+        // Retry loop: if the constraint quadratic has no real root, halve the arc-length and retry.
+        bool   step_converged = false;
+        unsigned int iterations_used = 0;
+
+        for (unsigned int retry = 0; retry <= mMaxArcLengthReductions && !step_converged; ++retry) {
+
+            // Reset step-local state at each retry.
+            mDeltaLambda = 0.0;
+            TSparseSpace::SetToZero(mDeltaU);
+
+            // ---- Predictor ----
+            TSystemVectorType delta_ut(rb.size());
+            TSparseSpace::SetToZero(delta_ut);
+
+            r_model_part.GetProcessInfo()[NL_ITERATION_NUMBER] = 0;
+            p_scheme->InitializeNonLinIteration(r_model_part, rA, rDx, rb);
+            r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] = 0;
+            r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] = 0;
+
+            // Build tangent K (predictor): honor mRebuildLevel / mStiffnessMatrixIsBuilt.
+            // - mRebuildLevel == 0 : never rebuild after first build (only if not yet built)
+            // - mRebuildLevel >= 1 : always rebuild at the predictor of every step
+            const bool build_predictor_lhs =
+                (BaseType::mRebuildLevel >= 1) || (BaseType::mStiffnessMatrixIsBuilt == false);
+            if (build_predictor_lhs) {
+                TSparseSpace::SetToZero(rA);
+                p_bs->BuildLHS(p_scheme, r_model_part, rA);
+                local_converged = LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol);
+				if (!local_converged) {
+					return false;
+				}
+
+                p_bs->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
+                BaseType::mStiffnessMatrixIsBuilt = true;
+            }
+
+            // Solve K * delta_ut = q
+            TSystemVectorType q_dir = mQ;
+            ZeroOutFixedDofs(r_dof_set, q_dir);
+            auto p_linear_solver = p_bs->GetLinearSystemSolver();
+            if (build_predictor_lhs) {
+                p_linear_solver->InitializeSolutionStep(rA, delta_ut, q_dir);
+            }
+            p_linear_solver->PerformSolutionStep(rA, delta_ut, q_dir);
+
+            const double ut_dot_ut = TSparseSpace::Dot(delta_ut, delta_ut);
+            const double denom = std::sqrt(ut_dot_ut + mBeta * mBeta * q_norm * q_norm);
+
+            // Auto-initialise arc-length on very first arc-length step if user provided <= 0.
+            if (mArcLength0 <= 0.0) {
+                mArcLength0 = denom;            // size of the very first predictor
+                mArcLength  = mArcLength0;
+            }
+
+            // Predictor magnitude and sign.
+            double d_lambda = (denom > 0.0) ? (mArcLength / denom) : 0.0;
+            d_lambda *= static_cast<double>(mPredictorSignHint);
+			if (d_lambda > max_d_lambda) {
+				d_lambda = max_d_lambda;
+			}
+			else if (d_lambda < -max_d_lambda) {
+				d_lambda = -max_d_lambda;
+			}
+
+			std::cout << "d_lambda: " << d_lambda << "; ut_dot_ut: " << ut_dot_ut << "; q_norm: " << q_norm << "; denom: " << denom << std::endl;
+
+            // Cap by mLambdaMax: do not overshoot the final target load factor.
+            if (mLambda + d_lambda > mLambdaMax) {
+                d_lambda = mLambdaMax - mLambda;
+            }
+
+            mDeltaLambda = d_lambda;
+            TSystemVectorType delta_u_predictor(rb.size());
+            TSparseSpace::Assign(delta_u_predictor, d_lambda, delta_ut);
+            noalias(mDeltaU) = delta_u_predictor;
+
+            // Apply predictor displacement to the DOF database.
+            UpdateDatabase(rA, delta_u_predictor, rb, BaseType::MoveMeshFlag());
+
+            // ---- Corrector iterations ----
+            unsigned int iteration_number = 1;
+            bool   converged = false;
+            bool   discriminant_failure = false;
+
+            while (!converged && iteration_number <= mMaxIterationNumber) {
+                r_model_part.GetProcessInfo()[NL_ITERATION_NUMBER] = iteration_number;
+                p_scheme->InitializeNonLinIteration(r_model_part, rA, rDx, rb);
+                r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] = 0;
+                r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] = 0;
+                mpConvergenceCriteria->InitializeNonLinearIteration(r_model_part, r_dof_set, rA, rDx, rb);
+
+                // Rebuild tangent (corrector): honor mRebuildLevel and mKeepSystemConstantDuringIterations.
+                // - mRebuildLevel  > 1 AND !KeepSystemConstant : rebuild each corrector iteration (full Newton)
+                // - mRebuildLevel == 1                         : keep K from predictor (modified Newton within the step)
+                // - mRebuildLevel == 0                         : never rebuild (initial-stiffness method)
+                const bool rebuild_corrector_lhs =
+                    (BaseType::mRebuildLevel > 1) && (mKeepSystemConstantDuringIterations == false);
+                if (rebuild_corrector_lhs) {
+                    TSparseSpace::SetToZero(rA);
+                    p_bs->BuildLHS(p_scheme, r_model_part, rA);
+                    local_converged = LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol);
+					if (!local_converged) {
+						return false;
+					}
+
+                    p_bs->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
+                    BaseType::mStiffnessMatrixIsBuilt = true;
+                }
+
+                // Residual at current (u, lambda): rb = (mLambda+mDeltaLambda) * d_ext_force - d_int_force
+                //                                    + previous_step_residual_terms
+                // The existing BuildRHS already uses GetCurrentLoadFraction() so this is consistent.
+                TSparseSpace::SetToZero(rb);
+                this->BuildRHS(r_model_part, r_dof_set, rb);
+                //local_converged = LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol);
+
+                // Solve K * delta_ubar = rb (residual correction)
+                TSystemVectorType delta_ubar(rb.size());
+                TSparseSpace::SetToZero(delta_ubar);
+                if (rebuild_corrector_lhs) {
+                    p_linear_solver->InitializeSolutionStep(rA, delta_ubar, rb);
+                }
+                p_linear_solver->PerformSolutionStep(rA, delta_ubar, rb);
+
+                // Solve K * delta_ut = q (tangent direction)
+                TSparseSpace::SetToZero(delta_ut);
+                TSystemVectorType q_dir2 = mQ;
+                ZeroOutFixedDofs(r_dof_set, q_dir2);
+                p_linear_solver->PerformSolutionStep(rA, delta_ut, q_dir2);
+
+                // Crisfield quadratic: a δλ² + b δλ + c = 0 with
+                //   x = Δu + δubar
+                //   a = δut·δut + β² ||q||²
+                //   b = 2 [ x·δut + β² ΔΛ ||q||² ]
+                //   c = x·x   + β² ΔΛ² ||q||² - L²
+                TSystemVectorType x(rb.size());
+                noalias(x) = mDeltaU + delta_ubar;
+
+                const double a = TSparseSpace::Dot(delta_ut, delta_ut) + mBeta*mBeta*q_norm*q_norm;
+                const double b = 2.0 * (TSparseSpace::Dot(x, delta_ut) + mBeta*mBeta*mDeltaLambda*q_norm*q_norm);
+                const double c = TSparseSpace::Dot(x, x) + mBeta*mBeta*mDeltaLambda*mDeltaLambda*q_norm*q_norm
+                                 - mArcLength*mArcLength;
+
+                const double discriminant = b*b - 4.0*a*c;
+                double d_lam = 0.0;
+				std::cout << "a: " << a << "; b: " << b << "; c: " << c << "; discriminant: " << discriminant << std::endl;
+                if (discriminant < 0.0 || a <= 0.0) {
+                    // Snap-back / ill-conditioned step: bail out to the retry loop with smaller arc-length.
+                    discriminant_failure = true;
+                    break;
+                } else {
+                    const double sq = std::sqrt(discriminant);
+                    const double r1 = (-b + sq) / (2.0 * a);
+                    const double r2 = (-b - sq) / (2.0 * a);
+                    // Crisfield angle criterion: pick the root maximizing (Δu + δu)·Δu
+                    TSystemVectorType du1(rb.size());
+                    TSystemVectorType du2(rb.size());
+                    noalias(du1) = delta_ubar + r1 * delta_ut;
+                    noalias(du2) = delta_ubar + r2 * delta_ut;
+                    const double dot1 = TSparseSpace::Dot(mDeltaU + du1, mDeltaU);
+                    const double dot2 = TSparseSpace::Dot(mDeltaU + du2, mDeltaU);
+                    d_lam = (dot1 >= dot2) ? r1 : r2;
+
+                    if (d_lam > max_d_lambda) {
+                        d_lam = max_d_lambda;
+                    }
+                    else if (d_lam < -max_d_lambda) {
+                        d_lam = -max_d_lambda;
+                    }
+                }
+
+                // Cap by mLambdaMax
+                if (mLambda + mDeltaLambda + d_lam > mLambdaMax) {
+                    d_lam = mLambdaMax - (mLambda + mDeltaLambda);
+                }
+
+                // Total iterative correction: δu = δubar + δλ * δut
+                TSystemVectorType delta_u(rb.size());
+                noalias(delta_u) = delta_ubar + d_lam * delta_ut;
+
+                // Update accumulated step state
+                mDeltaLambda += d_lam;
+                noalias(mDeltaU) += delta_u;
+
+                // Apply to DOF database
+                UpdateDatabase(rA, delta_u, rb, BaseType::MoveMeshFlag());
+
+                p_scheme->FinalizeNonLinIteration(r_model_part, rA, rDx, rb);
+                mpConvergenceCriteria->FinalizeNonLinearIteration(r_model_part, r_dof_set, rA, rDx, rb);
+                EchoInfo(iteration_number);
+
+                // Convergence: residual norm vs reference scaled by current load increment.
+                TSparseSpace::SetToZero(rb);
+                this->BuildRHS(r_model_part, r_dof_set, rb);
+                local_converged = LocalConvergenceAchieved(r_model_part.GetProcessInfo(), rel_tol);
+
+                const double rb_norm  = TSparseSpace::TwoNorm(rb);
+                const double ref_norm = std::max(mIniFNorm, q_norm * std::abs(mDeltaLambda));
+				converged = ((rb_norm < abs_tol) || (ref_norm > 0.0 && (rb_norm / ref_norm) < rel_tol)) && local_converged;
+
+                KRATOS_INFO_IF("ResidualBasedNewtonRaphsonStrategyTwo[ArcLength]", BaseType::GetEchoLevel() > 0)
+                    << "iter " << iteration_number
+                    << "  lambda=" << (mLambda + mDeltaLambda)
+                    << "  ||rb||=" << rb_norm
+                    << "  ref=" << ref_norm
+                    << "  converged=" << converged << std::endl;
+
+                if (!converged) ++iteration_number;
+            }
+
+            iterations_used = iteration_number;
+
+            if (discriminant_failure || !converged) {
+                // Roll back DOF database by reapplying -mDeltaU (so next retry starts from converged state).
+                TSystemVectorType rollback(rb.size());
+                TSparseSpace::Assign(rollback, -1.0, mDeltaU);
+                UpdateDatabase(rA, rollback, rb, BaseType::MoveMeshFlag());
+
+                // Halve the arc-length AND the per-step load-fraction cap in lockstep.
+                // Without halving max_d_lambda, the predictor would remain clamped to the same
+                // value across retries and trial N would reproduce trial 1 byte-for-byte.
+                const double new_arc = std::max(mArcLength * 0.5, mMinArcLengthFactor * mArcLength0);
+                const double scale   = (mArcLength > 0.0) ? (new_arc / mArcLength) : 0.5;
+                mArcLength    = new_arc;
+                max_d_lambda *= scale;
+
+                // Force the predictor of the next retry to rebuild K at the rolled-back state,
+                // regardless of mRebuildLevel. The DOF state has changed, so the cached K is stale.
+                //BaseType::mStiffnessMatrixIsBuilt = false;
+
+                KRATOS_WARNING("ResidualBasedNewtonRaphsonStrategyTwo[ArcLength]")
+                    << "Step failed (discriminant<0 or max-iter): halving arc-length to "
+                    << mArcLength << ", max_d_lambda=" << max_d_lambda
+                    << " (retry " << retry+1 << "/" << mMaxArcLengthReductions << ")" << std::endl;
+                continue;
+            }
+
+            step_converged = true;
+        }
+
+        if (!step_converged) {
+            MaxIterationsExceeded();
+            return false;
+        }
+
+        // Bookkeeping for FinalizeSolutionStep + next-step predictor sign.
+        mLastStepIterations = std::max<unsigned int>(iterations_used, 1u);
+        mLastStepConverged  = true;
+        mPredictorSignHint  = (mDeltaLambda >= 0.0) ? 1 : -1;
+
+        // Calculate reactions if required.
+        if (mCalculateReactionsFlag) {
+            p_bs->CalculateReactions(p_scheme, r_model_part, rA, *mpDx, rb);
+        }
+
+        return true;
+
+        KRATOS_CATCH("")
+    }
+
+    /// Arc-length adaptation: enlarges/shrinks the arc-length based on iterations used vs desired.
+    void AdaptArcLength()
+    {
+        if (mArcLength0 <= 0.0) return;
+        const double ratio = std::sqrt(static_cast<double>(mDesiredIterations) /
+                                       static_cast<double>(std::max<unsigned int>(mLastStepIterations, 1u)));
+        mArcLength = std::min(mMaxArcLengthFactor * mArcLength0,
+                              std::max(mMinArcLengthFactor * mArcLength0, mArcLength * ratio));
+    }
+
+    /// Update the converged load factor / previous external force vector at the end of a converged step.
+    void OnArcLengthConverged()
+    {
+        // Promote step into the running totals.
+        mLambda += mDeltaLambda;
+        if (mLambda > mLambdaMax) mLambda = mLambdaMax;
+        // Update mPreviousExternalForceVector so that the *next* step's q = (new mIniExt - prev) is correct.
+        // Since mIniExternalForceVector is rebuilt each step from element/condition contributions, we update
+        // the "previously applied" external force to reflect the converged scaled load.
+        if (mPreviousExternalForceVector.size() == mIniExternalForceVector.size()) {
+            noalias(mPreviousExternalForceVector) = mPreviousExternalForceVector + mDeltaLambda * mQ;
+        }
+        mDeltaLambda = 0.0;
+    }
+
+    /**
+     * @brief Solve a small dense k x k linear system M * x = b using
+     *        Gaussian elimination with partial pivoting. Returns false if M is singular.
+     *        Used for the Woodbury (I + V^T Z) capacitance system.
+     *        Note: rM and rRhs are taken by value (mutated locally).
+     */
+    bool SolveSmallDense(Matrix rM, Vector rRhs, Vector& rSolution)
+    {
+        const std::size_t k = rRhs.size();
+        rSolution.resize(k, false);
+        if (k == 0) return true;
+
+        // Forward elimination with partial pivoting
+        for (std::size_t i = 0; i < k; ++i) {
+            std::size_t pivot = i;
+            double pivot_val = std::abs(rM(i, i));
+            for (std::size_t r = i + 1; r < k; ++r) {
+                const double v = std::abs(rM(r, i));
+                if (v > pivot_val) { pivot_val = v; pivot = r; }
+            }
+            if (pivot_val < std::numeric_limits<double>::epsilon()) {
+                return false; // singular
+            }
+            if (pivot != i) {
+                for (std::size_t c = i; c < k; ++c) std::swap(rM(i, c), rM(pivot, c));
+                std::swap(rRhs[i], rRhs[pivot]);
+            }
+            const double diag = rM(i, i);
+            for (std::size_t r = i + 1; r < k; ++r) {
+                const double factor = rM(r, i) / diag;
+                if (factor == 0.0) continue;
+                for (std::size_t c = i; c < k; ++c) {
+                    rM(r, c) -= factor * rM(i, c);
+                }
+                rRhs[r] -= factor * rRhs[i];
+            }
+        }
+        // Back substitution
+        for (std::ptrdiff_t i = static_cast<std::ptrdiff_t>(k) - 1; i >= 0; --i) {
+            double s = rRhs[i];
+            for (std::size_t c = i + 1; c < k; ++c) {
+                s -= rM(i, c) * rSolution[c];
+            }
+            rSolution[i] = s / rM(i, i);
+        }
+        return true;
+    }
+
+    /**
+     * @brief Broyden quasi-Newton solver using the Sherman-Morrison-Woodbury identity.
+     *
+     * The tangent K0 is built and LU-factored ONCE at the start of the step
+     * (p_linear_solver->InitializeSolutionStep). All subsequent iterations reuse that
+     * factorization (p_linear_solver->PerformSolutionStep) and apply accumulated rank-1
+     * Broyden updates K_k = K0 + U V^T via:
+     *
+     *     (K0 + U V^T)^{-1} r = w - Z (I + V^T Z)^{-1} (V^T w),
+     *     where w = K0^{-1} r and Z = K0^{-1} U.
+     *
+     * Each new iteration appends one column:
+     *     s  = du,
+     *     y  = R_new - R              (here R = -rb, so y_kratos = rb - rb_new),
+     *     u  = y - K_k s,
+     *     v  = s / (s . s),
+     *     z  = K0^{-1} u              (sparse triangular solve, reused factorization).
+     */
+    bool SolveBroydenSolutionStep()
+    {
+        KRATOS_TRY
+
+        ModelPart& r_model_part = BaseType::GetModelPart();
+        typename TSchemeType::Pointer p_scheme = GetScheme();
+        typename TBuilderAndSolverType::Pointer p_builder_and_solver = GetBuilderAndSolver();
+        auto& r_dof_set = p_builder_and_solver->GetDofSet();
+
+        TSystemMatrixType& rA  = *mpA;
+        TSystemVectorType& rDx = *mpDx;
+        TSystemVectorType& rb  = *mpb;
+
+        const double abs_tol = mMaxGlobalAbsoluteError;
+		const double rel_tol = mMaxGlobalRelativeError;
+        const double local_rel_tol = mMaxLocalRelativeError;
+
+        // ---- Reference external force for relative convergence ----
+        mIniExternalForceVector.resize(rb.size(), false);
+        TSparseSpace::SetToZero(mIniExternalForceVector);
+        BuildExternalForceVector(r_model_part, mIniExternalForceVector);
+        mIniFNorm = TSparseSpace::TwoNorm(mIniExternalForceVector);
+
+        unsigned int iteration_number = 1;
+        r_model_part.GetProcessInfo()[NL_ITERATION_NUMBER] = iteration_number;
+        p_scheme->InitializeNonLinIteration(r_model_part, rA, rDx, rb);
+        r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] = 0;
+        r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] = 0;
+
+        // ---- Build K0 ONCE and LU-factor it ONCE ----
+        //TSparseSpace::SetToZero(rA);
+        TSparseSpace::SetToZero(rDx);
+        TSparseSpace::SetToZero(rb);
+
+
+        if (BaseType::mRebuildLevel > 1 || BaseType::mStiffnessMatrixIsBuilt == false)
+        {
+            TSparseSpace::SetToZero(rA);
+            p_builder_and_solver->BuildLHS(p_scheme, r_model_part, rA);
+        }
+
+        if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), local_rel_tol)) {
+            return false;
+        }
+        r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] = 0;
+        r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] = 0;
+
+        // Initial residual rb (= -R in Python notation: K * du = rb)
+        this->BuildRHS(r_model_part, r_dof_set, rb);
+        p_builder_and_solver->ApplyDirichletConditions(p_scheme, r_model_part, rA, rDx, rb);
+
+        // One-time LU decomposition of K0 
+        auto p_linear_solver = p_builder_and_solver->GetLinearSystemSolver();
+
+        if (BaseType::mRebuildLevel > 1 || BaseType::mStiffnessMatrixIsBuilt == false)
+        {
+            p_linear_solver->InitializeSolutionStep(rA, rDx, rb);
+            BaseType::mStiffnessMatrixIsBuilt = true;
+        }
+
+        
+
+        // ---- Broyden low-rank storage: K_k = K0 + sum_i U_i V_i^T ----
+        std::vector<TSystemVectorType> U_list;   // numerators
+        std::vector<TSystemVectorType> V_list;   // denominators
+        std::vector<TSystemVectorType> Z_list;   // K0^{-1} U_i (cached)
+
+        const std::size_t n = rb.size();
+        TSystemVectorType w(n);
+        TSystemVectorType rb_new(n);
+        TSystemVectorType K0s(n);
+        TSystemVectorType u_col(n);
+        TSystemVectorType z_col(n);
+        TSystemVectorType rb_solve(n);
+
+        bool is_converged = false;
+
+        for (; iteration_number <= mMaxIterationNumber; ++iteration_number) {
+
+            r_model_part.GetProcessInfo()[NL_ITERATION_NUMBER] = iteration_number;
+            if (iteration_number > 1) {
+                p_scheme->InitializeNonLinIteration(r_model_part, rA, rDx, rb);
+                mpConvergenceCriteria->InitializeNonLinearIteration(r_model_part, r_dof_set, rA, rDx, rb);
+            }
+            r_model_part.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] = 0;
+            r_model_part.GetProcessInfo()[N_PLASTIC_POINTS] = 0;
+
+            // ---- Convergence test on current residual rb ----
+            const double rb_norm = TSparseSpace::TwoNorm(rb);
+            is_converged = (rb_norm < abs_tol) ||
+                           (mIniFNorm > 0.0 && (rb_norm / mIniFNorm) < rel_tol);
+            std::cout << "[Broyden] iter " << iteration_number
+                      << "  ||rb||=" << rb_norm
+                      << "  ||F0||=" << mIniFNorm
+                      << "  k="      << U_list.size()
+                      << "  converged=" << is_converged << std::endl;
+            if (is_converged) break;
+
+            // ---- Woodbury solve:  du = (K0 + U V^T)^{-1} rb ----
+            // w = K0^{-1} rb  (sparse triangular solve; reuses cached LU factorization)
+            TSparseSpace::SetToZero(w);
+            TSparseSpace::Copy(rb, rb_solve); // PerformSolutionStep may consume the RHS
+            p_linear_solver->PerformSolutionStep(rA, w, rb_solve);
+
+            TSystemVectorType du(n);
+            const std::size_t k = U_list.size();
+            if (k > 0) {
+                // V^T w  (k-vector)
+                Vector VtW(k);
+                for (std::size_t i = 0; i < k; ++i) {
+                    VtW[i] = TSparseSpace::Dot(V_list[i], w);
+                }
+                // M = I + V^T Z   (k x k)
+                Matrix M(k, k);
+                for (std::size_t i = 0; i < k; ++i) {
+                    for (std::size_t j = 0; j < k; ++j) {
+                        M(i, j) = (i == j ? 1.0 : 0.0) + TSparseSpace::Dot(V_list[i], Z_list[j]);
+                    }
+                }
+                Vector alpha;
+                if (!SolveSmallDense(M, VtW, alpha)) {
+                    KRATOS_WARNING("ResidualBasedNewtonRaphsonStrategyTwo[Broyden]")
+                        << "Woodbury capacitance matrix singular at iter " << iteration_number
+                        << " (k=" << k << "); falling back to pure K0 step." << std::endl;
+                    noalias(du) = w;
+                } else {
+                    // du = w - Z * alpha
+                    noalias(du) = w;
+                    for (std::size_t j = 0; j < k; ++j) {
+                        noalias(du) -= alpha[j] * Z_list[j];
+                    }
+                }
+            } else {
+                noalias(du) = w;
+            }
+
+            // ---- Apply increment to the DOF database ----
+            TSparseSpace::Copy(du, rDx);
+
+            double relaxation_factor = 1.5;
+			rDx /= relaxation_factor; // under-relaxation to improve robustness of Broyden updates
+            UpdateDatabase(rA, rDx, rb, BaseType::MoveMeshFlag());
+
+            // ---- Compute the new residual at the updated state ----
+            TSparseSpace::SetToZero(rb_new);
+            this->BuildRHS(r_model_part, r_dof_set, rb_new);
+            if (!LocalConvergenceAchieved(r_model_part.GetProcessInfo(), local_rel_tol)) {
+                return false;
+            }
+
+            // ---- Build the new Broyden rank-1 column ----
+            //   s     = du
+            //   K_k s = K0 s + U (V^T s)
+            //   y     = rb - rb_new  
+            //   u_col = y - K_k s
+            //   v_col = s / (s . s)
+            //   z_col = K0^{-1} u_col   (reuses factorization)
+            const double s_dot_s = TSparseSpace::Dot(du, du);
+            if (s_dot_s > std::numeric_limits<double>::epsilon()) {
+                TSparseSpace::Mult(rA, du, K0s); // K0 * s
+                if (k > 0) {
+                    Vector VtS(k);
+                    for (std::size_t i = 0; i < k; ++i) {
+                        VtS[i] = TSparseSpace::Dot(V_list[i], du);
+                    }
+                    for (std::size_t i = 0; i < k; ++i) {
+                        noalias(K0s) += VtS[i] * U_list[i];
+                    }
+                }
+
+                TSystemVectorType y_col(n);
+                noalias(y_col) = rb - rb_new;
+
+                noalias(u_col) = y_col - K0s;
+
+                TSystemVectorType v_col(n);
+                noalias(v_col) = du / s_dot_s;
+
+                TSparseSpace::SetToZero(z_col);
+                TSystemVectorType u_solve(n);
+                TSparseSpace::Copy(u_col, u_solve);
+                p_linear_solver->PerformSolutionStep(rA, z_col, u_solve);
+
+                U_list.push_back(u_col);
+                V_list.push_back(v_col);
+                Z_list.push_back(z_col);
+            }
+
+            // Advance: R := R_new   <=>   rb := rb_new
+            TSparseSpace::Copy(rb_new, rb);
+
+            // Per-iteration housekeeping
+            EchoInfo(iteration_number);
+            p_scheme->FinalizeNonLinIteration(r_model_part, rA, rDx, rb);
+            mpConvergenceCriteria->FinalizeNonLinearIteration(r_model_part, r_dof_set, rA, rDx, rb);
+        }
+
+        if (!is_converged) {
+            MaxIterationsExceeded();
+        } else {
+            KRATOS_INFO_IF("ResidualBasedNewtonRaphsonStrategyTwo[Broyden]", this->GetEchoLevel() > 0)
+                << "Convergence achieved after " << iteration_number
+                << " / " << mMaxIterationNumber << " Broyden iterations (rank-"
+                << U_list.size() << " update)" << std::endl;
+        }
+
+        if (mCalculateReactionsFlag) {
+            p_builder_and_solver->CalculateReactions(p_scheme, r_model_part, rA, rDx, rb);
+        }
+
+        return is_converged;
+
+        KRATOS_CATCH("")
+    }
+
 
     ///@}
     ///@name Private Operators
@@ -1815,6 +2592,26 @@ class ResidualBasedNewtonRaphsonStrategyTwo
         mCalculateReactionsFlag = ThisParameters["compute_reactions"].GetBool();
         mUseOldStiffnessInFirstIteration = ThisParameters["use_old_stiffness_in_first_iteration"].GetBool();
 
+        // Arc-length settings
+        std::cout << "use_arc_length: " << ThisParameters["use_arc_length"].GetBool();
+        if (ThisParameters.Has("use_arc_length")) {
+            mUseArcLength = ThisParameters["use_arc_length"].GetBool();
+        }
+        if (ThisParameters.Has("use_broyden")) {
+            mUseBroyden = ThisParameters["use_broyden"].GetBool();
+        }
+        if (ThisParameters.Has("arc_length_settings")) {
+            const Parameters al = ThisParameters["arc_length_settings"];
+            if (al.Has("initial_arc_length"))        mArcLength0            = al["initial_arc_length"].GetDouble();
+            if (al.Has("max_arc_length_factor"))     mMaxArcLengthFactor    = al["max_arc_length_factor"].GetDouble();
+            if (al.Has("min_arc_length_factor"))     mMinArcLengthFactor    = al["min_arc_length_factor"].GetDouble();
+            if (al.Has("desired_iterations"))        mDesiredIterations     = al["desired_iterations"].GetInt();
+            if (al.Has("beta"))                      mBeta                  = al["beta"].GetDouble();
+            if (al.Has("max_load_factor"))           mLambdaMax             = al["max_load_factor"].GetDouble();
+            if (al.Has("max_arc_length_reductions")) mMaxArcLengthReductions= al["max_arc_length_reductions"].GetInt();
+            mArcLength = mArcLength0;
+        }
+
         // Saving the convergence criteria to be used
         if (ThisParameters["convergence_criteria_settings"].Has("name")) {
             KRATOS_ERROR << "IMPLEMENTATION PENDING IN CONSTRUCTOR WITH PARAMETERS" << std::endl;
@@ -1848,11 +2645,19 @@ class ResidualBasedNewtonRaphsonStrategyTwo
     void save(FileSerializer& rSerializer) const
     {
         rSerializer.save("PreviousExternalForceVector", mIniExternalForceVector);
+        rSerializer.save("ArcLengthLambda", mLambda);
+        rSerializer.save("ArcLength", mArcLength);
+        rSerializer.save("ArcLength0", mArcLength0);
+        rSerializer.save("ArcLengthSignHint", mPredictorSignHint);
     }
 
     void load(FileSerializer& rSerializer)
     {
         rSerializer.load("PreviousExternalForceVector", mPreviousExternalForceVector);
+        rSerializer.load("ArcLengthLambda", mLambda);
+        rSerializer.load("ArcLength", mArcLength);
+        rSerializer.load("ArcLength0", mArcLength0);
+        rSerializer.load("ArcLengthSignHint", mPredictorSignHint);
     }
 
     ///@}
@@ -1889,3 +2694,5 @@ class ResidualBasedNewtonRaphsonStrategyTwo
 ///@}
 
 } /* namespace Kratos. */
+
+

@@ -191,6 +191,8 @@ void AddCustomStrategiesToPython(const pybind11::module& m)
         .def("GetReformDofSetAtEachStepFlag", &ResidualBasedNewtonRaphsonStrategyType::GetReformDofSetAtEachStepFlag)
         .def("GetNonconvergedSolutions", &ResidualBasedNewtonRaphsonStrategyType::GetNonconvergedSolutions)
         .def("SetUpNonconvergedSolutionsFlag", &ResidualBasedNewtonRaphsonStrategyType::SetUpNonconvergedSolutionsFlag)
+        .def("SetUseBroyden", &ResidualBasedNewtonRaphsonStrategyType::SetUseBroyden)
+        .def("GetUseBroyden", &ResidualBasedNewtonRaphsonStrategyType::GetUseBroyden)
         ;
 }
 
