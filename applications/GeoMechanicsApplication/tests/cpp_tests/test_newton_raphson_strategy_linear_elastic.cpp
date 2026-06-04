@@ -259,13 +259,16 @@ void TestNewtonRaphsonLinearElasticDynamic(const double               DeltaTime,
     KRATOS_EXPECT_EQ(geo_custom_condition.GetCountCalculateMassMatrixCalled(), 1);
     KRATOS_EXPECT_EQ(geo_custom_condition.GetCalculateDampingMatrixCalled(), 1);
 
-    // rhs for conditions is called each solution step and during initialisation
+    // rhs for conditions is called each non linear iteration and during initialisation of acceleration
+    int n_rhs_calls = n_steps;
     if (UseIterations) {
-        // Two iterations are performed per solution step, thus rhs for conditions is called twice each solution step step and during initialisation
-        KRATOS_EXPECT_EQ(geo_custom_condition.GetCountCalculateRightHandSideCalled(), n_steps * 2 + 1);
-    } else {
-        KRATOS_EXPECT_EQ(geo_custom_condition.GetCountCalculateRightHandSideCalled(), n_steps + 1);
+        n_rhs_calls *= 2;
     }
+    if (CalculateInitialAcceleration) {
+        n_rhs_calls += 1;
+    }
+
+    KRATOS_EXPECT_EQ(geo_custom_condition.GetCountCalculateRightHandSideCalled(), n_rhs_calls);
 
     // check results
     KRATOS_EXPECT_VECTOR_RELATIVE_NEAR(calculated_displacement_x, rExpectedDisplacementX, 0.01);
@@ -439,6 +442,7 @@ KRATOS_TEST_CASE_IN_SUITE(NewtonRaphsonLinearElasticDynamicAllZeroOnRow, KratosG
         model_part, 1e-6, 1e-12, false, false, false);
     // initialize solver
     r_solver.Initialize();
+    r_solver.InitializeSolutionStep();
 
     auto& rSystemMatrix = r_solver.GetSystemMatrix();
 
@@ -511,6 +515,7 @@ KRATOS_TEST_CASE_IN_SUITE(NewtonRaphsonLinearElasticDynamicAllZeroDampingAndLump
         model_part, 1e-6, 1e-12, false, false, false);
     // initialize solver
     r_solver.Initialize();
+    r_solver.InitializeSolutionStep();
 
     auto& rSystemMatrix = r_solver.GetSystemMatrix();
 
@@ -580,9 +585,11 @@ KRATOS_TEST_CASE_IN_SUITE(NewtonRaphsonLinearElasticDynamicAllZeroMassOnDof, Kra
     // create strategy
     auto r_solver = NewtonRaphsonStrategyLinearElasticDynamicTester::CreateValidStrategy(
         model_part, 1e-6, 1e-12, false, false, false);
-    // initialize solver
+    r_solver.Initialize();
+
+    // initialize solution step
     KRATOS_EXPECT_EXCEPTION_IS_THROWN(
-        r_solver.Initialize(),
+        r_solver.InitializeSolutionStep(),
         "The system matrix and the mass matrix do not have values on the same degrees of freedom, "
         "the builder and solver cannot be used in this case.");
 }
@@ -644,6 +651,7 @@ KRATOS_TEST_CASE_IN_SUITE(NewtonRaphsonLinearElasticDynamicAllZeroMassOnFixedDof
 
     // no expection is thrown
     r_solver.Initialize();
+    r_solver.InitializeSolutionStep();
 
     auto& rSystemMatrix = r_solver.GetSystemMatrix();
 

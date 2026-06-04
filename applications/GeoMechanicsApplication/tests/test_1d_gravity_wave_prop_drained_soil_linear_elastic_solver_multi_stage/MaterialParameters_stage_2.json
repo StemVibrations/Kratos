@@ -22,7 +22,8 @@
                     "RESIDUAL_SATURATION": 1e-10,
                     "DYNAMIC_VISCOSITY": 0.0013,
                     "BULK_MODULUS_FLUID": 2000000000.0,
-                    "DENSITY_WATER": 1000
+                    "DENSITY_WATER": 1000,
+                    "MINIMUM_RELATIVE_PERMEABILITY"    :  0.0001
                 },
                 "constitutive_law": {
                     "name": "GeoLinearElasticPlaneStrain2DLaw"
@@ -52,7 +53,8 @@
                     "RESIDUAL_SATURATION": 1e-10,
                     "DYNAMIC_VISCOSITY": 0.0013,
                     "BULK_MODULUS_FLUID": 2000000000.0,
-                    "DENSITY_WATER": 1000
+                    "DENSITY_WATER": 1000,
+                    "MINIMUM_RELATIVE_PERMEABILITY"    :  0.0001
                 },
                 "constitutive_law": {
                     "name": "GeoLinearElasticPlaneStrain2DLaw"

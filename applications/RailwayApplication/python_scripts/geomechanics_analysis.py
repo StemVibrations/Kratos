@@ -37,12 +37,11 @@ class StemGeoMechanicsAnalysis(GeoMechanicsAnalysis):
     #
     #     # In GeoMechanicsAnalysis, DISPLACEMENT and ROTATION will be set to zero every stage. This prevents
     #     # this behavior in the STEM application. Instead the constitutive law will be reset at the end of each stage.
-    #     self._GetSolver().main_model_part.ProcessInfo[KratosGeo.RESET_DISPLACEMENTS] = self.reset_displacements
     #     if self.reset_displacements:
     #         self.ResetIfHasNodalSolutionStepVariable(KratosGeo.TOTAL_DISPLACEMENT)
     #         Kratos.VariableUtils().UpdateCurrentToInitialConfiguration(
     #             self._GetSolver().GetComputingModelPart().Nodes)
-
+    #
     # def Finalize(self):
     #     """
     #     Finalize stage and reset constitutive law of each element
