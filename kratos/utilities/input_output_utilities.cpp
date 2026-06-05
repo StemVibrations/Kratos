@@ -34,6 +34,10 @@ bool InputOutputUtilities::SkippableEntity(
     constexpr bool is_element = std::is_same_v<TEntityType, Element>;
     constexpr bool is_condition = std::is_same_v<TEntityType, Condition>;
     if constexpr (is_element || is_condition) {
+    	if (!rEntity.IsActive()) {
+			return true; // If the entity is not active, it is skippable
+		}
+
         const auto& r_geometry = rEntity.GetGeometry();
         switch (r_geometry.GetGeometryType()) {
             case GeometryData::KratosGeometryType::Kratos_Nurbs_Curve:

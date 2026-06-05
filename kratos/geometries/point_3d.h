@@ -567,7 +567,14 @@ public:
     {
         return 0;
     }
-	
+
+	GeometriesArrayType GenerateFaces() const override
+    {
+        GeometriesArrayType faces = GeometriesArrayType();
+
+        return faces;
+    }
+
 	    /// @copydoc Geometry::GenerateEdges
     GeometriesArrayType GenerateEdges() const override
     {
@@ -839,4 +846,4 @@ const GeometryDimension Point3D<TPointType>::msGeometryDimension(3, 0);
 
 }  // namespace Kratos.
 
-#endif // KRATOS_LINE_2D_H_INCLUDED  defined
+#endif // KRATOS_POINT_3D_H_INCLUDED  defined
