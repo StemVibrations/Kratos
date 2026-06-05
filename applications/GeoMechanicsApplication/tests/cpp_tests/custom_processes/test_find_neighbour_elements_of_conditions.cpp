@@ -136,12 +136,12 @@ TEST_F(KratosGeoMechanicsFastSuiteWithoutKernel, TestFindNeighboursForMultipleCo
     EXPECT_EQ(p_condition2->GetValue(NEIGHBOUR_ELEMENTS)[0].GetId(), 1);
 }
 
-class ParametrizedFindNeighbouring3D4NElementsThrowsWhenNotFoundFixture
+class ParametrizedFindNeighbouring3D4NElementsReversedSearchFixture
     : public ::testing::TestWithParam<std::vector<std::size_t>>
 {
 };
 
-TEST_P(ParametrizedFindNeighbouring3D4NElementsThrowsWhenNotFoundFixture, ProcessThrowsWhenNoNeighboringElementsAreFound)
+TEST_F(ParametrizedFindNeighbouring3D4NElementsReversedSearchFixture, TestFindNeighboursWithReversedSearch)
 {
     // Arrange
     Model model;
@@ -156,13 +156,14 @@ TEST_P(ParametrizedFindNeighbouring3D4NElementsThrowsWhenNotFoundFixture, Proces
     FindNeighbourElementsOfConditionsProcess process(r_model_part);
 
     // Act & Assert
-    KRATOS_EXPECT_EXCEPTION_IS_THROWN(process.Execute(),
-                                      "The condition(s) with the following ID(s) is/are found "
-                                      "without any corresponding element: [1]");
+    EXPECT_EQ(p_condition->GetValue(NEIGHBOUR_ELEMENTS).size(), 0);
+    process.Execute();
+    EXPECT_EQ(p_condition->GetValue(NEIGHBOUR_ELEMENTS).size(), 1);
+    EXPECT_EQ(p_condition->GetValue(NEIGHBOUR_ELEMENTS)[0].GetId(), 1);
 }
 
 INSTANTIATE_TEST_SUITE_P(KratosGeoMechanicsFastSuiteWithoutKernel,
-                         ParametrizedFindNeighbouring3D4NElementsThrowsWhenNotFoundFixture,
+                         ParametrizedFindNeighbouring3D4NElementsReversedSearchFixture,
                          ::testing::Values(std::vector<std::size_t>{1, 2, 3},
                                            std::vector<std::size_t>{4, 2, 1},
                                            std::vector<std::size_t>{1, 3, 4}));
