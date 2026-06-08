@@ -442,15 +442,11 @@ void VtkOutput::WriteCellType(const TContainerType& rContainer, std::ofstream& r
     // Write entity types
     for (const auto& r_entity : rContainer) {
         if (InputOutputUtilities::SkippableEntity(r_entity, "VtkOutput")) continue;
-        int cell_type = -1;
+        int cell_type = 0;
         const auto& r_geometry = r_entity.GetGeometry();
         const auto& r_kratos_cell = r_geometry.GetGeometryType();
         if (VtkDefinitions::KratosVtkGeometryTypes.count(r_kratos_cell) > 0) {
             cell_type = VtkDefinitions::KratosVtkGeometryTypes.at(r_kratos_cell);
-        } else {
-            KRATOS_ERROR << "Modelpart contains elements or conditions with "
-            << "geometries for which no VTK-output is implemented!" << std::endl
-            << "Cell type: " << static_cast<int>(r_kratos_cell) << std::endl;
         }
 
         WriteScalarDataToFile( (int)cell_type, rFileStream);
@@ -967,27 +963,13 @@ void VtkOutput::WriteVectorContainerVariable(
         return;
     }
 
-    int res_size = static_cast<int>((rContainer.begin()->GetValue(rVariable)).size());
+    const int res_size = static_cast<int>((rContainer.begin()->GetValue(rVariable)).size());
+
     rFileStream << rVariable.Name() << " " << res_size << " " << container_size << "  float\n";
-   
-    int max_size = 0;
-    for (const auto& r_entity : rContainer) {
-        if (InputOutputUtilities::SkippableEntity(r_entity, "VtkOutput")) continue;
-        max_size = std::max(max_size, static_cast<int>(r_entity.GetValue(rVariable).size()));
-    }
 
     for (const auto& r_entity : rContainer) {
-        int new_res_size = r_entity.GetValue(rVariable).size();
-        //if (new_res_size != res_size)
-        //{ 
-        //    rFileStream << rVariable.Name() << " " << new_res_size << " " << container_size << "  float\n";
-        //}
-		rFileStream << "# Entity " << r_entity.Id() << " has result size " << new_res_size << std::endl;
-        std::cout << "new res size " << new_res_size << std::endl;
         if (InputOutputUtilities::SkippableEntity(r_entity, "VtkOutput")) continue;
         const auto& r_result = r_entity.GetValue(rVariable);
-
-		
         WriteVectorDataToFile(r_result, rFileStream);
         if (mFileFormat == VtkOutput::FileFormat::VTK_ASCII) rFileStream <<"\n";
     }
@@ -1009,13 +991,6 @@ void VtkOutput::WriteIntegrationVectorContainerVariable(
 
     // determining size of results
     const auto& r_process_info = mrModelPart.GetProcessInfo();
-    
-    //rContainer.begin()->CalculateOnIntegrationPoints(rVariable, tmp_result, r_process_info);
-    // if no results, return
-	//std::cout << "Size of results at integration points: " << tmp_result.size() << std::endl;
-    //if (tmp_result.size() == 0) {
-    //    return;
-    //}
 
     int res_size = 0;
     for (auto& r_entity : rContainer) {
@@ -1056,7 +1031,7 @@ void VtkOutput::WriteIntegrationVectorContainerVariable(
         {
 			is_all_empty = true;
         }
-        
+
         if (!is_all_empty) {
 
             for (const TVarType& r_value : aux_result) {

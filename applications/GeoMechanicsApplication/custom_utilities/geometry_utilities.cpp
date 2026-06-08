@@ -32,7 +32,7 @@ std::size_t GetNumberOfCornerPoints(GeometryData::KratosGeometryFamily GeometryF
     case Kratos_Quadrilateral:
         return 4;
     default:
-        KRATOS_ERROR << "The specified geometry family is not supported for getting the number of "
+        KRATOS_ERROR << "The specified geometry family: " << static_cast<int>(GeometryFamily) << " is not supported for getting the number of "
                         "corner points.\n";
     }
 }
