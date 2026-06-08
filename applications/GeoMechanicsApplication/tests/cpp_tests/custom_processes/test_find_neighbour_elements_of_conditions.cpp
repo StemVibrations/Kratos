@@ -141,7 +141,7 @@ class ParametrizedFindNeighbouring3D4NElementsReversedSearchFixture
 {
 };
 
-TEST_F(ParametrizedFindNeighbouring3D4NElementsReversedSearchFixture, TestFindNeighboursWithReversedSearch)
+TEST_P(ParametrizedFindNeighbouring3D4NElementsReversedSearchFixture, TestFindNeighboursWithReversedSearch)
 {
     // Arrange
     Model model;
