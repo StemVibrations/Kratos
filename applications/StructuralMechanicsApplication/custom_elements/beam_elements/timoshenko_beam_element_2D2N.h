@@ -427,6 +427,9 @@ public:
      */
     double GetCrossArea();
 
+    void Calculate(const Variable<Vector>& rVariable, Vector& rOutput, const ProcessInfo& rCurrentProcessInfo) override;
+    using Element::Calculate;
+
     ///@}
     ///@name Access
     ///@{
@@ -530,6 +533,11 @@ private:
     ///@name Private Operations
     ///@{
 
+    void CalculateInternalForces(VectorType& rRHS,
+        const ProcessInfo& rProcessInfo);
+
+    void CalculateExternalForces(VectorType& rRHS,
+        const ProcessInfo& rProcessInfo);
 
     ///@}
     ///@name Private  Access

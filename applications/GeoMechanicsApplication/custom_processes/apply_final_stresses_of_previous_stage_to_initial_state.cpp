@@ -57,7 +57,11 @@ void ApplyFinalStressesOfPreviousStageToInitialState::ExecuteInitialize()
 void ApplyFinalStressesOfPreviousStageToInitialState::ExecuteBeforeSolutionLoop()
 {
     for (const auto& r_model_part : mrModelParts) {
-        block_for_each(r_model_part.get().Elements(), [&r_model_part, this](Element& rElement) {
+		for (Element& rElement : r_model_part.get().Elements()) {
+        //block_for_each(r_model_part.get().Elements(), [&r_model_part, this](Element& rElement) {
+			if (rElement.IsNot(ACTIVE)) {
+				continue;
+			}
             std::vector<ConstitutiveLaw::Pointer> constitutive_laws;
             rElement.CalculateOnIntegrationPoints(CONSTITUTIVE_LAW, constitutive_laws,
                                                   r_model_part.get().GetProcessInfo());
@@ -69,7 +73,7 @@ void ApplyFinalStressesOfPreviousStageToInitialState::ExecuteBeforeSolutionLoop(
                 constitutive_laws[i]->SetInitialState(p_initial_state);
                 constitutive_laws[i]->InitializeMaterial(rElement.GetProperties(), rElement.GetGeometry(), {});
             }
-        });
+        };
     }
     mStressesByElementId.clear();
 }
