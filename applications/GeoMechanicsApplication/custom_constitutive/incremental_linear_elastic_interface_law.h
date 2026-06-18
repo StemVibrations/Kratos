@@ -50,6 +50,11 @@ public:
                const GeometryType& rElementGeometry,
                const ProcessInfo&  rCurrentProcessInfo) const override;
 
+    /**
+    * @brief It resets all the member variables and flags
+    */
+    void ResetMaterial(const Properties&, const GeometryType&, const Vector&) override;
+
 private:
     GeoIncrementalLinearElasticInterfaceLaw() = default;
 
