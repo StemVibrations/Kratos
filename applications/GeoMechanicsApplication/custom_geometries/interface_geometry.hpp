@@ -223,18 +223,18 @@ public:
 
     GeometriesArrayType GenerateEdges() const override
     {
-        KRATOS_ERROR_IF_NOT(mpMidGeometry->GetGeometryFamily() == GeometryData::KratosGeometryFamily::Kratos_Linear)
-            << "Edges can only be generated for line geometries. This is a surface interface "
-               "geometry, which does not support edges.\n";
+//        KRATOS_ERROR_IF_NOT(mpMidGeometry->GetGeometryFamily() == GeometryData::KratosGeometryFamily::Kratos_Linear)
+//            << "Edges can only be generated for line geometries. This is a surface interface "
+//               "geometry, which does not support edges.\n";
 
         return GenerateTwoSides();
     }
 
     GeometriesArrayType GenerateFaces() const override
     {
-        KRATOS_ERROR_IF(mpMidGeometry->GetGeometryFamily() == GeometryData::KratosGeometryFamily::Kratos_Linear)
-            << "Faces can only be generated for surface geometries. This is a line "
-               "interface geometry, which does not support faces.\n";
+//        KRATOS_ERROR_IF(mpMidGeometry->GetGeometryFamily() == GeometryData::KratosGeometryFamily::Kratos_Linear)
+//            << "Faces can only be generated for surface geometries. This is a line "
+//               "interface geometry, which does not support faces.\n";
 
         return GenerateTwoSides();
     }
@@ -246,6 +246,7 @@ public:
         case Kratos_Linear:
             return this->GenerateEdges();
         case Kratos_Triangle:
+            return this->GenerateFaces();
         case Kratos_Quadrilateral:
             return this->GenerateFaces();
         default:

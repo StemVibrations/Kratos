@@ -37,7 +37,7 @@ public:
     static array_1d<double, TNumNodes> GetNodalValues(const NodeContainerType& rNodes,
                                                       const Variable<double>&  rNodalVariable)
     {
-        auto result = array_1d<double, TNumNodes>{};
+        array_1d<double, TNumNodes> result = array_1d<double, TNumNodes>{};
         GetNodalValues(rNodes, rNodalVariable, result.begin());
         return result;
     }
