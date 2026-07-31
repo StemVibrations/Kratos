@@ -23,6 +23,8 @@
 #include "includes/serializer.h"
 #include "utilities/math_utils.h"
 
+#include <algorithm>
+
 namespace
 {
 
@@ -63,6 +65,18 @@ bool CoulombWithTensionCutOffImpl::IsAdmissibleStressState(const Geo::SigmaTau& 
 bool CoulombWithTensionCutOffImpl::IsAdmissibleStressState(const Geo::PrincipalStresses& rTrialPrincipalStresses)
 {
     return IsAdmissibleStressState<>(rTrialPrincipalStresses);
+}
+
+double CoulombWithTensionCutOffImpl::YieldFunctionValue(const Geo::PrincipalStresses& rPrincipalStresses) const
+{
+    return std::max(mCoulombYieldSurface.YieldFunctionValue(rPrincipalStresses),
+                    mTensionCutOff.YieldFunctionValue(rPrincipalStresses));
+}
+
+double CoulombWithTensionCutOffImpl::YieldFunctionValue(const Geo::SigmaTau& rTraction) const
+{
+    return std::max(mCoulombYieldSurface.YieldFunctionValue(rTraction),
+                    mTensionCutOff.YieldFunctionValue(rTraction));
 }
 
 Geo::SigmaTau CoulombWithTensionCutOffImpl::DoReturnMapping(const Geo::SigmaTau& rTrialTraction,

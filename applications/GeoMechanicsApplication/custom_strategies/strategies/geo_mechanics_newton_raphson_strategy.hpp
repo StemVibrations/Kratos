@@ -17,6 +17,7 @@
 #include "includes/define.h"
 #include "includes/kratos_parameters.h"
 #include "includes/model_part.h"
+#include "custom_strategies/strategies/residualbased_newton_raphson_strategy_two.h"
 #include "solving_strategies/strategies/residualbased_newton_raphson_strategy.h"
 
 // Application includes
@@ -27,13 +28,14 @@ namespace Kratos
 
 template <class TSparseSpace, class TDenseSpace, class TLinearSolver>
 class GeoMechanicsNewtonRaphsonStrategy
-    : public ResidualBasedNewtonRaphsonStrategy<TSparseSpace, TDenseSpace, TLinearSolver>
+    : public ResidualBasedNewtonRaphsonStrategyTwo<TSparseSpace, TDenseSpace, TLinearSolver>
 {
 public:
     KRATOS_CLASS_POINTER_DEFINITION(GeoMechanicsNewtonRaphsonStrategy);
 
     using BaseType   = ImplicitSolvingStrategy<TSparseSpace, TDenseSpace, TLinearSolver>;
-    using MotherType = ResidualBasedNewtonRaphsonStrategy<TSparseSpace, TDenseSpace, TLinearSolver>;
+    using MotherType = ResidualBasedNewtonRaphsonStrategyTwo<TSparseSpace, TDenseSpace, TLinearSolver>;
+    //using MotherType = ResidualBasedNewtonRaphsonStrategy<TSparseSpace, TDenseSpace, TLinearSolver>;
     using TConvergenceCriteriaType = ConvergenceCriteria<TSparseSpace, TDenseSpace>;
     using TBuilderAndSolverType    = typename BaseType::TBuilderAndSolverType;
     using TSchemeType              = typename BaseType::TSchemeType;
@@ -66,11 +68,14 @@ public:
                                       int                                     MaxIterations = 30,
                                       bool CalculateReactions                               = false,
                                       bool ReformDofSetAtEachStep                           = false,
-                                      bool MoveMeshFlag                                     = false)
-        : ResidualBasedNewtonRaphsonStrategy<TSparseSpace, TDenseSpace, TLinearSolver>(
-              model_part, pScheme, pNewConvergenceCriteria, pNewBuilderAndSolver, MaxIterations, CalculateReactions, ReformDofSetAtEachStep, MoveMeshFlag)
+                                      bool MoveMeshFlag                                     = false,
+                                      bool ReadForce = false)
+        //: ResidualBasedNewtonRaphsonStrategy<TSparseSpace, TDenseSpace, TLinearSolver>(
+        //      model_part, pScheme, pNewConvergenceCriteria, pNewBuilderAndSolver, MaxIterations, CalculateReactions, ReformDofSetAtEachStep, MoveMeshFlag)
+        : ResidualBasedNewtonRaphsonStrategyTwo<TSparseSpace, TDenseSpace, TLinearSolver>(
+            model_part, pScheme, pNewConvergenceCriteria, pNewBuilderAndSolver, rParameters, MaxIterations, CalculateReactions, ReformDofSetAtEachStep, MoveMeshFlag)
     {
-        // only include validation with c++11 since raw_literals do not exist in c++03
+        // only include validation with c++11 since raw_literals do not exist in c++03 
         Parameters default_parameters(R"(
                 {
                     "min_iteration":    2,
@@ -83,11 +88,41 @@ public:
                     "min_radius_factor": 0.5,
                     "search_neighbours_step": false,
                     "body_domain_sub_model_part_list": [],
-                    "rebuild_level": 2
+                    "rebuild_level": 2,
+                    "quasi_newton_type": "broyden",
+                    "quasi_newton_restart_interval": 50,
+                    "quasi_newton_max_rank" : 10   
                 }  )");
 
         // Validate against defaults -- this also ensures no type mismatch
         rParameters.ValidateAndAssignDefaults(default_parameters);
+
+  //      // Forward arc-length settings (if requested) to the base strategy.
+  //      if (rParameters["iteration_method"].GetString() == "arc_length") {
+  //          this->SetUseArcLength(true);
+  //          const Parameters al = rParameters["arc_length_settings"];
+  //          this->SetArcLengthSettings(
+  //              al["initial_arc_length"].GetDouble(),
+  //              al["max_arc_length_factor"].GetDouble(),
+  //              al["min_arc_length_factor"].GetDouble(),
+  //              static_cast<unsigned int>(al["desired_iterations"].GetInt()),
+  //              al["beta"].GetDouble(),
+  //              al["max_load_factor"].GetDouble(),
+  //              static_cast<unsigned int>(al["max_arc_length_reductions"].GetInt())
+  //          );
+  //      }
+		//else if (rParameters["iteration_method"].GetString() == "broyden") {
+		//	this->SetUseBroyden(true);
+		//	const Parameters broyden_settings = rParameters["broyden_settings"];
+		//	this->SetBroydenSettings(
+		//		broyden_settings["absolute_global_error"].GetDouble(),
+		//		broyden_settings["relative_global_error"].GetDouble(),
+		//		broyden_settings["relative_local_error"].GetDouble(),
+		//		broyden_settings["max_rank"].GetInt(),
+		//		broyden_settings["max_reset_interval"].GetInt()
+		//	);
+
+		//}
     }
 }; // Class GeoMechanicsNewtonRaphsonStrategy
 

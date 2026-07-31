@@ -139,10 +139,15 @@ void NodalConcentratedElement::GetDofList(
 
     rElementalDofList.resize( 0 );
 
-    rElementalDofList.push_back( GetGeometry()[0].pGetDof( DISPLACEMENT_X ) );
-    rElementalDofList.push_back( GetGeometry()[0].pGetDof( DISPLACEMENT_Y ) );
+    const auto& r_displacement_variable_x = KratosComponents<Variable<double >>::Get("TOTAL_DISPLACEMENT_X");
+    const auto& r_displacement_variable_y = KratosComponents<Variable<double >>::Get("TOTAL_DISPLACEMENT_Y");
+	const auto& r_displacement_variable_z = KratosComponents<Variable<double >>::Get("TOTAL_DISPLACEMENT_Z");
+
+
+    rElementalDofList.push_back( GetGeometry()[0].pGetDof(r_displacement_variable_x) );
+    rElementalDofList.push_back( GetGeometry()[0].pGetDof( r_displacement_variable_y ) );
     if( dimension == 3 )
-        rElementalDofList.push_back( GetGeometry()[0].pGetDof( DISPLACEMENT_Z ) );
+        rElementalDofList.push_back( GetGeometry()[0].pGetDof(r_displacement_variable_z) );
 }
 
 //************************************************************************************
@@ -159,10 +164,14 @@ void NodalConcentratedElement::EquationIdVector(
     if ( rResult.size() != dimension )
         rResult.resize( dimension, false );
 
-    rResult[0] = GetGeometry()[0].GetDof( DISPLACEMENT_X ).EquationId();
-    rResult[1] = GetGeometry()[0].GetDof( DISPLACEMENT_Y ).EquationId();
+    const auto& r_displacement_variable_x = KratosComponents<Variable<double >>::Get("TOTAL_DISPLACEMENT_X");
+    const auto& r_displacement_variable_y = KratosComponents<Variable<double >>::Get("TOTAL_DISPLACEMENT_Y");
+    const auto& r_displacement_variable_z = KratosComponents<Variable<double >>::Get("TOTAL_DISPLACEMENT_Z");
+
+    rResult[0] = GetGeometry()[0].GetDof(r_displacement_variable_x).EquationId();
+    rResult[1] = GetGeometry()[0].GetDof(r_displacement_variable_y).EquationId();
     if( dimension == 3)
-        rResult[2] = GetGeometry()[0].GetDof( DISPLACEMENT_Z ).EquationId();
+        rResult[2] = GetGeometry()[0].GetDof(r_displacement_variable_z).EquationId();
 }
 
 //*********************************DISPLACEMENT***************************************
@@ -176,11 +185,15 @@ void NodalConcentratedElement::GetValuesVector( Vector& rValues, int Step ) cons
     if ( rValues.size() != dimension )
         rValues.resize( dimension, false );
 
-    rValues[0] = GetGeometry()[0].GetSolutionStepValue( DISPLACEMENT_X, Step );
-    rValues[1] = GetGeometry()[0].GetSolutionStepValue( DISPLACEMENT_Y, Step );
-
+	const auto& r_displacement_variable_x = KratosComponents<Variable<double >>::Get("TOTAL_DISPLACEMENT_X");
+    const auto& r_displacement_variable_y = KratosComponents<Variable<double >>::Get("TOTAL_DISPLACEMENT_Y");
+    
+    rValues[0] = GetGeometry()[0].GetSolutionStepValue(r_displacement_variable_x, Step );
+    rValues[1] = GetGeometry()[0].GetSolutionStepValue(r_displacement_variable_y, Step );
+    const auto& r_displacement_variable_z = KratosComponents<Variable<double >>::Get("TOTAL_DISPLACEMENT_Z");
     if ( dimension == 3 )
-        rValues[2] = GetGeometry()[0].GetSolutionStepValue( DISPLACEMENT_Z, Step );
+        
+        rValues[2] = GetGeometry()[0].GetSolutionStepValue(r_displacement_variable_z, Step );
 }
 
 
@@ -255,8 +268,8 @@ void NodalConcentratedElement::CalculateRightHandSide(VectorType& rRightHandSide
         rRightHandSideVector.resize( system_size, false );
 
     rRightHandSideVector = ZeroVector( system_size ); //resetting RHS
-
-    const array_1d<double, 3 >& current_displacement = GetGeometry()[0].FastGetSolutionStepValue(DISPLACEMENT);
+    const auto& r_displacement_variable = KratosComponents<Variable<array_1d<double, 3>>>::Get("TOTAL_DISPLACEMENT");
+    const array_1d<double, 3 >& current_displacement = GetGeometry()[0].FastGetSolutionStepValue(r_displacement_variable);
     array_1d<double, 3 > volume_acceleration = ZeroVector(3);
 
     if( GetGeometry()[0].SolutionStepsDataHas(VOLUME_ACCELERATION) )
@@ -275,6 +288,72 @@ void NodalConcentratedElement::CalculateRightHandSide(VectorType& rRightHandSide
     const array_1d<double, 3 >& nodal_stiffness = rconst_this.GetValue(NODAL_DISPLACEMENT_STIFFNESS);
     for ( unsigned int j = 0; j < dimension; ++j )
         rRightHandSideVector[j]  -= nodal_stiffness[j] * current_displacement[j];
+}
+
+
+void NodalConcentratedElement::CalculateInternalForces(VectorType& rRightHandSideVector,
+    const ProcessInfo& rProcessInfo) {
+    const unsigned int dimension = GetGeometry().WorkingSpaceDimension();
+
+    // Resizing as needed the RHS
+    const unsigned int system_size = dimension;
+
+    if (rRightHandSideVector.size() != system_size)
+        rRightHandSideVector.resize(system_size, false);
+
+    rRightHandSideVector = ZeroVector(system_size); //resetting RHS
+    const auto& r_displacement_variable = KratosComponents<Variable<array_1d<double, 3>>>::Get("TOTAL_DISPLACEMENT");
+    const array_1d<double, 3 >& current_displacement = GetGeometry()[0].FastGetSolutionStepValue(r_displacement_variable);
+
+
+    // We get the reference
+    const auto& rconst_this = *this;
+
+    // Compute and add internal forces
+    const array_1d<double, 3 >& nodal_stiffness = rconst_this.GetValue(NODAL_DISPLACEMENT_STIFFNESS);
+    for (unsigned int j = 0; j < dimension; ++j)
+        rRightHandSideVector[j] += nodal_stiffness[j] * current_displacement[j];
+
+}
+
+void NodalConcentratedElement::CalculateExternalForces(VectorType& rRightHandSideVector,
+    const ProcessInfo& rProcessInfo)
+{
+    const unsigned int dimension = GetGeometry().WorkingSpaceDimension();
+
+    // Resizing as needed the RHS
+    const unsigned int system_size = dimension;
+
+    if (rRightHandSideVector.size() != system_size)
+        rRightHandSideVector.resize(system_size, false);
+
+    rRightHandSideVector = ZeroVector(system_size); //resetting RHS
+    array_1d<double, 3 > volume_acceleration = ZeroVector(3);
+
+    if (GetGeometry()[0].SolutionStepsDataHas(VOLUME_ACCELERATION))
+        volume_acceleration = GetGeometry()[0].FastGetSolutionStepValue(VOLUME_ACCELERATION);
+
+    // We get the reference
+    const auto& rconst_this = *this;
+
+    // Compute and add external forces
+    const double nodal_mass = rconst_this.GetValue(NODAL_MASS);
+
+    for (unsigned int j = 0; j < dimension; ++j)
+        rRightHandSideVector[j] += volume_acceleration[j] * nodal_mass;
+}
+
+void NodalConcentratedElement::Calculate(const Variable<Vector>& rVariable, Vector& rOutput, const ProcessInfo& rCurrentProcessInfo)
+{
+    if (rVariable == INTERNAL_FORCES_VECTOR) {
+        CalculateInternalForces(rOutput, rCurrentProcessInfo);
+    }
+    else if (rVariable == EXTERNAL_FORCES_VECTOR) {
+        CalculateExternalForces(rOutput, rCurrentProcessInfo);
+    }
+    else {
+        KRATOS_ERROR << "Variable " << rVariable.Name() << " not supported in element " << this->Info() << std::endl;
+    }
 }
 
 //***********************************************************************************

@@ -41,7 +41,7 @@ void ApplyBoundaryHydrostaticPressureTableProcess::ExecuteInitializeSolutionStep
     const auto  delta_h    = mpTable->GetValue(time);
 
     block_for_each(GetModelPart().Nodes(), [&delta_h, &r_variable, this](Node& rNode) {
-        const auto distance = GetReferenceCoordinate() - rNode.Coordinates()[GetGravityDirection()];
+        const auto distance = GetReferenceCoordinate()[GetGravityDirection()] - rNode.Coordinates()[GetGravityDirection()];
         const auto pressure = GetSpecificWeight() * (distance + delta_h);
         rNode.FastGetSolutionStepValue(r_variable) = std::max(pressure, 0.0);
     });
