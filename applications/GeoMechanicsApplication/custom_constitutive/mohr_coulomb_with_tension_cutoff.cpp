@@ -108,6 +108,60 @@ std::size_t CalculateAdaptiveNumberOfSubSteps(CoulombWithTensionCutOffImpl& rImp
     return std::clamp(number_of_sub_steps, std::size_t{1}, MaxNumberOfSubSteps);
 }
 
+// Pegasus algorithm (an accelerated regula-falsi / false-position method with guaranteed
+// convergence, see Dowell & Jarratt 1972 and Sloan, Abbo & Sheng 2001). It locates the
+// factor alpha in [0, 1] at which the elastic stress path
+//     sigma(alpha) = sigma_start + alpha * (D : delta_eps)
+// first touches the yield surface, i.e. where the combined yield function F(alpha) == 0.
+// The caller must guarantee that the start state is elastic (F(0) < 0) and the trial state
+// is inadmissible (F(1) > 0), so that a single root is bracketed by [0, 1].
+double CalculateYieldSurfaceIntersectionFactor(CoulombWithTensionCutOffImpl& rImpl,
+                                               const Vector& rStartStressVector,
+                                               const Vector& rElasticStressIncrement)
+{
+    // Hard-coded control parameters (no extra material input required).
+    constexpr auto        yield_function_tolerance = 1.0e-10;
+    constexpr std::size_t max_number_of_iterations = 100;
+
+    const auto yield_function_value_at = [&](double Alpha) {
+        const Vector stress_vector = rStartStressVector + Alpha * rElasticStressIncrement;
+        const auto&  principal_stresses =
+            StressStrainUtilities::CalculatePrincipalStressesAndRotationMatrix(stress_vector).first;
+        return rImpl.YieldFunctionValue(principal_stresses);
+    };
+
+    auto alpha_0 = 0.0;
+    auto alpha_1 = 1.0;
+    auto f_0     = yield_function_value_at(alpha_0);
+    auto f_1     = yield_function_value_at(alpha_1);
+
+    // If the bracket is not valid (e.g. the start state is already on/outside the surface),
+    // there is no elastic portion to skip.
+    if (f_0 >= 0.0) return 0.0;
+    if (f_1 <= 0.0) return 1.0;
+
+    auto alpha = alpha_1;
+    for (std::size_t iteration = 0; iteration < max_number_of_iterations; ++iteration) {
+        alpha             = alpha_1 - f_1 * (alpha_1 - alpha_0) / (f_1 - f_0);
+        const auto f_new  = yield_function_value_at(alpha);
+        if (std::abs(f_new) < yield_function_tolerance) break;
+
+        if (f_new * f_1 < 0.0) {
+            // Root is between alpha_1 and alpha; move the lower bound up.
+            alpha_0 = alpha_1;
+            f_0     = f_1;
+        } else {
+            // Pegasus acceleration: rescale the retained function value to avoid the
+            // one-sided stagnation of the classic regula-falsi method.
+            f_0 *= f_1 / (f_1 + f_new);
+        }
+        alpha_1 = alpha;
+        f_1     = f_new;
+    }
+
+    return std::clamp(alpha, 0.0, 1.0);
+}
+
 } // namespace
 
 namespace Kratos
@@ -260,24 +314,44 @@ void MohrCoulombWithTensionCutOff::CalculateMaterialResponseCauchy(ConstitutiveL
         return;
     }
 
+    // ----- Pegasus yield-surface intersection -----
+    // Locate the fraction of the strain increment that remains purely elastic before the
+    // stress path first touches the yield surface. Only the remaining (plastic) part needs
+    // to be integrated with the return mapping, which improves both accuracy and robustness.
+    const Vector elastic_stress_increment = full_trial_stress_vector - mStressVectorFinalized;
+    const double intersection_factor      = CalculateYieldSurfaceIntersectionFactor(
+        mCoulombWithTensionCutOffImpl, mStressVectorFinalized, elastic_stress_increment);
+
+    // Advance elastically up to the intersection point; this becomes the starting (committed)
+    // state for the sub-stepped plastic integration.
+    const Vector plastic_start_stress =
+        mStressVectorFinalized + intersection_factor * elastic_stress_increment;
+    const Vector plastic_start_strain =
+        mStrainVectorFinalized + intersection_factor * total_strain_increment;
+
+    // The remaining strain increment that produces plastic flow.
+    const Vector plastic_strain_increment = (1.0 - intersection_factor) * total_strain_increment;
+
+    mStressVector = plastic_start_stress;
+
     // ----- adaptive strain sub-stepping (with an upper bound) -----
     // The maximum number of sub-steps caps the cost for strongly plastic points. Increase it
     // for more robustness (at higher cost); it could also be exposed as a material property.
-    constexpr std::size_t max_number_of_sub_steps = 1;
+    constexpr std::size_t max_number_of_sub_steps = 100; 
     const std::size_t     number_of_sub_steps     = CalculateAdaptiveNumberOfSubSteps(
         mCoulombWithTensionCutOffImpl, full_trial_principal_stresses, elastic_matrix,
         max_number_of_sub_steps);
 
-    // Running committed state for the sub-stepping (start from last finalized state)
-    Vector committed_stress = mStressVectorFinalized;
-    Vector committed_strain = mStrainVectorFinalized;
+    // Running committed state for the sub-stepping (start from the Pegasus intersection point)
+    Vector committed_stress = plastic_start_stress;
+    Vector committed_strain = plastic_start_strain;
 
     for (std::size_t sub = 1; sub <= number_of_sub_steps; ++sub) {
         // strain at the end of this sub-step
         const Vector sub_strain =
-            mStrainVectorFinalized +
+            plastic_start_strain +
             (static_cast<double>(sub) / static_cast<double>(number_of_sub_steps)) *
-                total_strain_increment;
+                plastic_strain_increment;
 
         // elastic predictor from the *committed* sub-step state
         const Vector trial_stress_vector =
