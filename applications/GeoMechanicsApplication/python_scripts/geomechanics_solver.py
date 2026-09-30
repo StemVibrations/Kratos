@@ -90,6 +90,9 @@ class GeoMechanicalSolver(PythonSolver):
             "strategy_type": "newton_raphson",
             "max_piping_iterations": 50,
             "convergence_criterion": "Displacement_criterion",
+            "use_local_error_criteria": false,
+            "local_error_criteria_settings": {},
+            "deactivate_unsupported_interfaces": true,
             "water_pressure_relative_tolerance": 1.0e-4,
             "water_pressure_absolute_tolerance": 1.0e-9,
             "displacement_relative_tolerance": 1.0e-4,
@@ -224,6 +227,11 @@ class GeoMechanicalSolver(PythonSolver):
         """Perform initialization after adding nodal variables and dofs to the main model part. """
         self.computing_model_part = self.GetComputingModelPart()
 
+        # Interfaces that lost the support at one of their sides (e.g. due to an excavation) can't
+        # transfer any traction, so they are deactivated before the stage is solved
+        if self.settings["deactivate_unsupported_interfaces"].GetBool():
+            self._DeactivateUnsupportedInterfaces()
+
         # Fill the previous steps of the buffer with the initial conditions
         self._FillBuffer()
 
@@ -238,6 +246,8 @@ class GeoMechanicalSolver(PythonSolver):
 
         # Get the convergence criterion
         self.convergence_criterion = self._ConstructConvergenceCriterion(self.settings["convergence_criterion"].GetString())
+        if self.settings["use_local_error_criteria"].GetBool():
+            self.convergence_criterion = self._AddLocalErrorCriterion(self.convergence_criterion)
 
         self.solving_strategy = self._create_solving_strategy(self.builder_and_solver,
                                                               self.settings["strategy_type"].GetString())
@@ -479,6 +489,8 @@ class GeoMechanicalSolver(PythonSolver):
             self.strategy_params.AddValue("quasi_newton_type", self.settings["quasi_newton_type"])
             self.strategy_params.AddValue("quasi_newton_restart_interval", self.settings["quasi_newton_restart_interval"])
             self.strategy_params.AddValue("quasi_newton_max_rank", self.settings["quasi_newton_max_rank"])
+            self.strategy_params.AddValue("relaxation_factor", self.settings["relaxation_factor"])
+            self.strategy_params.AddValue("extrapolate_previous_increment", self.settings["extrapolate_previous_increment"])
 
             solving_strategy = GeoMechanicsApplication.GeoMechanicsNewtonRaphsonStrategy(self.computing_model_part,
                                                                                          self.scheme,
@@ -585,6 +597,28 @@ class GeoMechanicalSolver(PythonSolver):
         residual_criterion.SetEchoLevel(self.settings["echo_level"].GetInt())
 
         return residual_criterion
+
+    def _DeactivateUnsupportedInterfaces(self):
+        process = GeoMechanicsApplication.DeactivateUnsupportedInterfacesProcess(self.computing_model_part)
+        process.Execute()
+        number_of_deactivated_interfaces = process.GetNumberOfDeactivatedInterfaces()
+        if number_of_deactivated_interfaces > 0:
+            KratosMultiphysics.Logger.PrintInfo(
+                "GeoMechanicalSolver",
+                f"Deactivated {number_of_deactivated_interfaces} interface element(s) without an active "
+                "element at one of their sides")
+
+    def _AddLocalErrorCriterion(self, convergence_criterion):
+        """Combines the given (global) convergence criterion with the local error criteria, i.e. both
+        need to be satisfied for convergence."""
+        local_error_criteria_settings = self.settings["local_error_criteria_settings"]
+        # Note that the criterion adds any missing (default) settings
+        has_own_echo_level = local_error_criteria_settings.Has("echo_level")
+        local_error_criterion = GeoMechanicsApplication.GeoLocalErrorCriteria(local_error_criteria_settings)
+        if not has_own_echo_level:
+            local_error_criterion.SetEchoLevel(self.settings["echo_level"].GetInt())
+
+        return KratosMultiphysics.AndCriteria(convergence_criterion, local_error_criterion)
 
     def _MakeWaterPressureCriterion(self):
         relative_tolerance = self.settings["water_pressure_relative_tolerance"].GetDouble()

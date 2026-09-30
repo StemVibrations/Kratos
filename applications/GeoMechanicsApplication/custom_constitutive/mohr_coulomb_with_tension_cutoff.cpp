@@ -18,6 +18,7 @@
 #include "custom_constitutive/principal_stresses.hpp"
 #include "custom_utilities/check_utilities.hpp"
 #include "custom_utilities/constitutive_law_utilities.h"
+#include "custom_utilities/local_error_utilities.h"
 #include "custom_utilities/math_utilities.hpp"
 #include "custom_utilities/stress_strain_utilities.h"
 #include "geo_mechanics_application_variables.h"
@@ -100,7 +101,7 @@ std::size_t CalculateAdaptiveNumberOfSubSteps(CoulombWithTensionCutOffImpl& rImp
 
     // Each sub-step's elastic predictor is allowed to overshoot the yield surface by at most
     // this fraction of the stress magnitude before we subdivide further.
-    constexpr auto target_relative_overshoot_per_sub_step = 0.1;
+    constexpr auto target_relative_overshoot_per_sub_step = 0.01;
 
     const auto number_of_sub_steps = static_cast<std::size_t>(
         std::ceil(relative_overshoot / target_relative_overshoot_per_sub_step));
@@ -121,7 +122,7 @@ double CalculateYieldSurfaceIntersectionFactor(CoulombWithTensionCutOffImpl& rIm
 {
     // Hard-coded control parameters (no extra material input required).
     constexpr auto        yield_function_tolerance = 1.0e-10;
-    constexpr std::size_t max_number_of_iterations = 100;
+    constexpr std::size_t max_number_of_iterations = 500;
 
     const auto yield_function_value_at = [&](double Alpha) {
         const Vector stress_vector = rStartStressVector + Alpha * rElasticStressIncrement;
@@ -171,7 +172,8 @@ MohrCoulombWithTensionCutOff::MohrCoulombWithTensionCutOff(std::unique_ptr<Const
     : mpConstitutiveDimension(std::move(pConstitutiveDimension)),
       mStressVector(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
       mStressVectorFinalized(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
-      mStrainVectorFinalized(ZeroVector(mpConstitutiveDimension->GetStrainSize()))
+      mStrainVectorFinalized(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
+      mTrialStressVector(ZeroVector(mpConstitutiveDimension->GetStrainSize()))
 {
 }
 
@@ -182,6 +184,8 @@ ConstitutiveLaw::Pointer MohrCoulombWithTensionCutOff::Clone() const
     p_result->mStressVectorFinalized        = mStressVectorFinalized;
     p_result->mStrainVectorFinalized        = mStrainVectorFinalized;
     p_result->mCoulombWithTensionCutOffImpl = mCoulombWithTensionCutOffImpl;
+    p_result->mTrialStressVector            = mTrialStressVector;
+    p_result->mIsPlastic                    = mIsPlastic;
     return p_result;
 }
 
@@ -209,6 +213,9 @@ void MohrCoulombWithTensionCutOff::SetValue(const Variable<Vector>& rVariable,
 {
     if (rVariable == CAUCHY_STRESS_VECTOR) {
         mStressVector = rValue;
+        // A stress state that is imposed from outside is regarded as an elastic state
+        mTrialStressVector = rValue;
+        mIsPlastic         = false;
     } else {
         KRATOS_ERROR << "Can't set value of " << rVariable.Name() << ": unsupported variable\n";
     }
@@ -307,8 +314,11 @@ void MohrCoulombWithTensionCutOff::CalculateMaterialResponseCauchy(ConstitutiveL
         StressStrainUtilities::CalculatePrincipalStressesAndRotationMatrix(full_trial_stress_vector);
     (void)full_rotation_matrix; // not needed when the whole step is elastic
 
+    mTrialStressVector = full_trial_stress_vector;
+    mIsPlastic = !mCoulombWithTensionCutOffImpl.IsAdmissibleStressState(full_trial_principal_stresses);
+
     // If the whole step stays elastic, there is nothing to integrate and no need to sub-step.
-    if (mCoulombWithTensionCutOffImpl.IsAdmissibleStressState(full_trial_principal_stresses)) {
+    if (!mIsPlastic) {
         mStressVector                 = full_trial_stress_vector;
         rParameters.GetStressVector() = mStressVector;
         return;
@@ -337,7 +347,7 @@ void MohrCoulombWithTensionCutOff::CalculateMaterialResponseCauchy(ConstitutiveL
     // ----- adaptive strain sub-stepping (with an upper bound) -----
     // The maximum number of sub-steps caps the cost for strongly plastic points. Increase it
     // for more robustness (at higher cost); it could also be exposed as a material property.
-    constexpr std::size_t max_number_of_sub_steps = 100; 
+    constexpr std::size_t max_number_of_sub_steps = 500; 
     const std::size_t     number_of_sub_steps     = CalculateAdaptiveNumberOfSubSteps(
         mCoulombWithTensionCutOffImpl, full_trial_principal_stresses, elastic_matrix,
         max_number_of_sub_steps);
@@ -402,6 +412,23 @@ void MohrCoulombWithTensionCutOff::FinalizeMaterialResponseCauchy(ConstitutiveLa
 {
     mStrainVectorFinalized = rValues.GetStrainVector();
     mStressVectorFinalized = mStressVector;
+}
+
+std::optional<Geo::StressPointType> MohrCoulombWithTensionCutOff::GetStressPointType() const
+{
+    return Geo::StressPointType::Soil;
+}
+
+Geo::LocalErrorData MohrCoulombWithTensionCutOff::CalculateLocalErrorData(ConstitutiveLaw::Parameters& rParameters)
+{
+    auto result      = Geo::LocalErrorData{};
+    result.IsPlastic = mIsPlastic;
+    result.ElasticPredictorDeviation = mTrialStressVector.size() == mStressVector.size()
+                                           ? Vector{mTrialStressVector - mStressVector}
+                                           : Vector{ZeroVector(mStressVector.size())};
+    result.MaximumShearStress = LocalErrorUtilities::CalculateMaximumShearStress(mStressVector);
+    result.Cohesion = LocalErrorUtilities::GetCohesionIfAvailable(rParameters.GetMaterialProperties());
+    return result;
 }
 
 void MohrCoulombWithTensionCutOff::save(Serializer& rSerializer) const

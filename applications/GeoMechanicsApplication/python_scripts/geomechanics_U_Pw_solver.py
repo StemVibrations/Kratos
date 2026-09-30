@@ -71,6 +71,8 @@ class UPwSolver(GeoSolver):
             "quasi_newton_type": "broyden",
             "quasi_newton_restart_interval": 50,
             "quasi_newton_max_rank" : 10,
+            "relaxation_factor"          : 0.8333333333333334,
+            "extrapolate_previous_increment": false,
             "first_alpha_value"          : 0.5,
             "second_alpha_value"         : 1.0,
             "min_alpha"                  : 0.1,

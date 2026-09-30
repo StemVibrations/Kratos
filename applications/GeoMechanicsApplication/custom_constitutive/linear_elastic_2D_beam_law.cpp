@@ -48,6 +48,12 @@ SizeType LinearElastic2DBeamLaw::WorkingSpaceDimension() { return N_DIM_2D; }
 
 SizeType LinearElastic2DBeamLaw::GetStrainSize() const { return VOIGT_SIZE_2D_PLANE_STRESS; }
 
+std::optional<Geo::StressPointType> LinearElastic2DBeamLaw::GetStressPointType() const
+{
+    // The local error criteria only apply to soil and interface elements
+    return std::nullopt;
+}
+
 void LinearElastic2DBeamLaw::CalculateElasticMatrix(Matrix& C, ConstitutiveLaw::Parameters& rValues)
 {
     KRATOS_TRY

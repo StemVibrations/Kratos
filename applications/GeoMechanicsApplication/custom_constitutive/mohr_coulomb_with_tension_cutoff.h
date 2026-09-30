@@ -15,6 +15,7 @@
 #pragma once
 
 #include "custom_constitutive/coulomb_with_tension_cut_off_impl.h"
+#include "custom_constitutive/local_error_data_provider.h"
 #include "includes/constitutive_law.h"
 
 namespace Kratos
@@ -22,7 +23,8 @@ namespace Kratos
 
 class ConstitutiveLawDimension;
 
-class KRATOS_API(GEO_MECHANICS_APPLICATION) MohrCoulombWithTensionCutOff : public ConstitutiveLaw
+class KRATOS_API(GEO_MECHANICS_APPLICATION) MohrCoulombWithTensionCutOff : public ConstitutiveLaw,
+                                                                           public LocalErrorDataProvider
 {
 public:
     KRATOS_CLASS_POINTER_DEFINITION(MohrCoulombWithTensionCutOff);
@@ -61,6 +63,9 @@ public:
     void CalculateMaterialResponseCauchy(ConstitutiveLaw::Parameters& rParameters) override;
     void FinalizeMaterialResponseCauchy(ConstitutiveLaw::Parameters& rValues) override;
 
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+    [[nodiscard]] Geo::LocalErrorData CalculateLocalErrorData(ConstitutiveLaw::Parameters& rParameters) override;
+
 private:
     std::unique_ptr<ConstitutiveLawDimension> mpConstitutiveDimension;
     Vector                                    mStressVector;
@@ -68,6 +73,11 @@ private:
     Vector                                    mStrainVectorFinalized;
     CoulombWithTensionCutOffImpl              mCoulombWithTensionCutOffImpl;
     bool                                      mIsModelInitialized = false;
+
+    // Transient data of the most recent stress calculation, used by the local error criteria:
+    // the elastic predictor of the whole step and whether plastic flow occurred in the step
+    Vector mTrialStressVector;
+    bool   mIsPlastic = false;
 
     [[nodiscard]] Vector CalculateTrialStressVector(const Vector& rStrainVector, const Properties& rProperties) const;
 

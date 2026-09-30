@@ -15,6 +15,7 @@
 #pragma once
 
 #include "custom_constitutive/coulomb_with_tension_cut_off_impl.h"
+#include "custom_constitutive/local_error_data_provider.h"
 #include "includes/constitutive_law.h"
 
 namespace Kratos
@@ -22,7 +23,8 @@ namespace Kratos
 
 class ConstitutiveLawDimension;
 
-class KRATOS_API(GEO_MECHANICS_APPLICATION) InterfaceCoulombWithTensionCutOff : public ConstitutiveLaw
+class KRATOS_API(GEO_MECHANICS_APPLICATION) InterfaceCoulombWithTensionCutOff : public ConstitutiveLaw,
+                                                                                public LocalErrorDataProvider
 {
 public:
     KRATOS_CLASS_POINTER_DEFINITION(InterfaceCoulombWithTensionCutOff);
@@ -64,6 +66,9 @@ public:
                            Matrix&                 rValue) override;
     using ConstitutiveLaw::CalculateValue;
 
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+    [[nodiscard]] Geo::LocalErrorData CalculateLocalErrorData(Parameters& rConstitutiveLawParameters) override;
+
 private:
     std::unique_ptr<ConstitutiveLawDimension> mpConstitutiveDimension;
     Vector                                    mTractionVector;
@@ -71,6 +76,11 @@ private:
     Vector                                    mRelativeDisplacementVectorFinalized;
     CoulombWithTensionCutOffImpl              mCoulombWithTensionCutOffImpl;
     bool                                      mIsModelInitialized = false;
+
+    // Transient data of the most recent traction calculation, used by the local error criteria:
+    // the elastic predictor of the whole step and whether plastic flow occurred in the step
+    Vector mTrialTractionVector;
+    bool   mIsPlastic = false;
 
     [[nodiscard]] Geo::SigmaTau CalculateTrialTractionVector(const Vector& rRelativeDisplacementVector,
                                                              double NormalStiffness,

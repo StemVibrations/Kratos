@@ -139,6 +139,11 @@ SizeType SmallStrainUMAT3DInterfaceLaw::WorkingSpaceDimension() { return Dimensi
 
 SizeType SmallStrainUMAT3DInterfaceLaw::GetStrainSize() const { return VoigtSize; }
 
+std::optional<Geo::StressPointType> SmallStrainUMAT3DInterfaceLaw::GetStressPointType() const
+{
+    return Geo::StressPointType::Interface;
+}
+
 ConstitutiveLaw::StrainMeasure SmallStrainUMAT3DInterfaceLaw::GetStrainMeasure()
 {
     return StrainMeasure_Infinitesimal;

@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include "custom_constitutive/local_error_data_provider.h"
 #include "includes/constitutive_law.h"
 #include "includes/kratos_export_api.h"
 
@@ -20,7 +21,9 @@ namespace Kratos
 {
 class ConstitutiveLawDimension;
 
-class KRATOS_API(GEO_MECHANICS_APPLICATION) GeoIncrementalLinearElasticInterfaceLaw : public ConstitutiveLaw
+class KRATOS_API(GEO_MECHANICS_APPLICATION) GeoIncrementalLinearElasticInterfaceLaw
+    : public ConstitutiveLaw,
+      public LocalErrorDataProvider
 {
 public:
     using BaseType = ConstitutiveLaw;
@@ -49,6 +52,9 @@ public:
     int  Check(const Properties&   rMaterialProperties,
                const GeometryType& rElementGeometry,
                const ProcessInfo&  rCurrentProcessInfo) const override;
+
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+    [[nodiscard]] Geo::LocalErrorData CalculateLocalErrorData(Parameters& rParameters) override;
 
 private:
     GeoIncrementalLinearElasticInterfaceLaw() = default;

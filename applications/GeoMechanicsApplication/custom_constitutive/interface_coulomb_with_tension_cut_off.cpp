@@ -18,6 +18,7 @@
 #include "custom_constitutive/sigma_tau.hpp"
 #include "custom_utilities/check_utilities.hpp"
 #include "custom_utilities/constitutive_law_utilities.h"
+#include "custom_utilities/local_error_utilities.h"
 #include "custom_utilities/math_utilities.hpp"
 #include "custom_utilities/stress_strain_utilities.h"
 #include "geo_mechanics_application_constants.h"
@@ -121,7 +122,8 @@ InterfaceCoulombWithTensionCutOff::InterfaceCoulombWithTensionCutOff(std::unique
     : mpConstitutiveDimension(std::move(pConstitutiveDimension)),
       mTractionVector(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
       mTractionVectorFinalized(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
-      mRelativeDisplacementVectorFinalized(ZeroVector(mpConstitutiveDimension->GetStrainSize()))
+      mRelativeDisplacementVectorFinalized(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
+      mTrialTractionVector(ZeroVector(mpConstitutiveDimension->GetStrainSize()))
 {
 }
 
@@ -133,6 +135,8 @@ ConstitutiveLaw::Pointer InterfaceCoulombWithTensionCutOff::Clone() const
     p_result->mRelativeDisplacementVectorFinalized = mRelativeDisplacementVectorFinalized;
     p_result->mCoulombWithTensionCutOffImpl        = mCoulombWithTensionCutOffImpl;
     p_result->mIsModelInitialized                  = mIsModelInitialized;
+    p_result->mTrialTractionVector                 = mTrialTractionVector;
+    p_result->mIsPlastic                           = mIsPlastic;
     return p_result;
 }
 
@@ -160,6 +164,9 @@ void InterfaceCoulombWithTensionCutOff::SetValue(const Variable<Vector>& rVariab
 {
     if (rVariable == GEO_EFFECTIVE_TRACTION_VECTOR) {
         mTractionVector = rValue;
+        // A traction that is imposed from outside is regarded as an elastic state
+        mTrialTractionVector = rValue;
+        mIsPlastic           = false;
     } else {
         KRATOS_ERROR << "Can't set value of " << rVariable.Name() << ": unsupported variable\n";
     }
@@ -252,8 +259,11 @@ void InterfaceCoulombWithTensionCutOff::CalculateMaterialResponseCauchy(Paramete
     auto full_trial_for_check  = full_trial_sigma_tau;
     full_trial_for_check.Tau() = std::abs(full_trial_for_check.Tau());
 
+    mTrialTractionVector = full_trial_sigma_tau.CopyTo<Vector>();
+    mIsPlastic           = !mCoulombWithTensionCutOffImpl.IsAdmissibleStressState(full_trial_for_check);
+
     // If the whole step stays elastic, there is nothing to integrate and no need to sub-step.
-    if (mCoulombWithTensionCutOffImpl.IsAdmissibleStressState(full_trial_for_check)) {
+    if (!mIsPlastic) {
         mTractionVector                              = full_trial_sigma_tau.CopyTo<Vector>();
         rConstitutiveLawParameters.GetStressVector() = mTractionVector;
         return;
@@ -338,6 +348,26 @@ void InterfaceCoulombWithTensionCutOff::FinalizeMaterialResponseCauchy(Parameter
 {
     mRelativeDisplacementVectorFinalized = rConstitutiveLawParameters.GetStrainVector();
     mTractionVectorFinalized             = mTractionVector;
+}
+
+std::optional<Geo::StressPointType> InterfaceCoulombWithTensionCutOff::GetStressPointType() const
+{
+    return Geo::StressPointType::Interface;
+}
+
+Geo::LocalErrorData InterfaceCoulombWithTensionCutOff::CalculateLocalErrorData(Parameters& rConstitutiveLawParameters)
+{
+    auto result      = Geo::LocalErrorData{};
+    result.IsPlastic = mIsPlastic;
+    result.ElasticPredictorDeviation = mTrialTractionVector.size() == mTractionVector.size()
+                                           ? Vector{mTrialTractionVector - mTractionVector}
+                                           : Vector{ZeroVector(mTractionVector.size())};
+    result.IndexOfFirstShearComponent = mpConstitutiveDimension->GetNumberOfNormalComponents();
+    result.MaximumShearStress         = LocalErrorUtilities::CalculateShearTractionMagnitude(
+        mTractionVector, result.IndexOfFirstShearComponent);
+    result.Cohesion =
+        LocalErrorUtilities::GetCohesionIfAvailable(rConstitutiveLawParameters.GetMaterialProperties());
+    return result;
 }
 
 Matrix& InterfaceCoulombWithTensionCutOff::CalculateValue(Parameters& rConstitutiveLawParameters,

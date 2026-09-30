@@ -25,6 +25,9 @@
 #include "solving_strategies/strategies/solving_strategy.h"
 #include "custom_strategies/strategies/residualbased_newton_raphson_strategy_two.h"
 
+// convergence criteria
+#include "custom_strategies/convergence_criteria/geo_local_error_criteria.h"
+
 // builders and solvers
 #include "custom_strategies/builder_and_solvers/residualbased_block_builder_and_solver_with_mass_and_damping.hpp"
 #include "custom_strategies/builder_and_solvers/residualbased_block_builder_and_solver_linear_elastic_dynamic.h"
@@ -146,6 +149,12 @@ void AddCustomStrategiesToPython(const pybind11::module& m)
         m, "GeoMechanicNewtonRaphsonStrategyLinearElasticDynamic")
         .def(py::init<ModelPart&, BaseSchemeType::Pointer, ConvergenceCriteriaType::Pointer,
                       BuilderAndSolverType::Pointer, int, bool, bool>());
+
+    using GeoLocalErrorCriteriaType = GeoLocalErrorCriteria<SparseSpaceType, LocalSpaceType>;
+    py::class_<GeoLocalErrorCriteriaType, typename GeoLocalErrorCriteriaType::Pointer, ConvergenceCriteriaType>(
+        m, "GeoLocalErrorCriteria")
+        .def(py::init<>())
+        .def(py::init<Parameters>());
 
     using ResidualBasedBlockBuilderAndSolverWithMassAndDampingType =
         ResidualBasedBlockBuilderAndSolverWithMassAndDamping<SparseSpaceType, LocalSpaceType, LinearSolverType>;

@@ -12,6 +12,9 @@
 
 #pragma once
 
+// System includes
+#include <algorithm>
+
 // Project includes
 #include "factories/linear_solver_factory.h"
 #include "includes/define.h"
@@ -79,7 +82,9 @@ namespace Kratos
                 {
                     "quasi_newton_type": "broyden",
                     "quasi_newton_restart_interval": 50,
-                    "quasi_newton_max_rank" : 10
+                    "quasi_newton_max_rank" : 10,
+                        "extrapolate_previous_increment": false,
+                        "relaxation_factor": 0.8333333333333334
 
                 }  )");
 
@@ -104,6 +109,9 @@ namespace Kratos
 
             mRestartInterval = rParameters["quasi_newton_restart_interval"].GetInt();
             mMaxRank = rParameters["quasi_newton_max_rank"].GetInt();
+            mRelaxationFactor = rParameters["relaxation_factor"].GetDouble();
+            KRATOS_ERROR_IF(mRelaxationFactor <= 0.0)
+                << "'relaxation_factor' must be positive, got " << mRelaxationFactor << std::endl;
 
             // it is required to use a direct solver without scaling for the quasi-newton strategy, as the strategy depends on reusing the factorization of the initial stiffness matrix.
             auto linear_solver_settings = Parameters(R"(
@@ -139,6 +147,13 @@ namespace Kratos
 
             TSparseSpace::SetToZero(rDx);
             TSparseSpace::SetToZero(rb);
+
+            // must be evaluated before the first residual of the step is built
+            this->InitializeStageUnbalanceIfNeeded(rb.size());
+
+            // L-BFGS pairs describe the curvature along the iterates of a single step; pairs of a previous
+            // (converged or cut back) step are not valid for the current one
+            mLbfgsRankStorage.Clear();
 
             bool rebuild_lhs = false;
             if (BaseType::mRebuildLevel > 0 || !BaseType::mStiffnessMatrixIsBuilt) {
@@ -240,17 +255,54 @@ namespace Kratos
         BroydenRankStorage mBroydenRankStorage;
         unsigned int       mRestartInterval = 100; // rebuild K0 every N iterations to refresh curvature
         unsigned int mMaxRank = 10; // maximum number of low-rank updates to store (Broyden or BFGS)
+        double       mRelaxationFactor = 1.0; // scales the quasi-Newton increment before it is applied
         typename TLinearSolver::Pointer mpLinearSolver;
 
+        // The out-of-balance force vector at the start of the stage (in the constrained space), i.e. the
+        // unbalance that results from (de)activating elements and changing materials or loads. Only the load fraction
+        // of this unbalance is applied in a step, such that each
+        // step converges to an equilibrium state:
+        //     r = f_ext - f_int - (1 - load_fraction) * r_stage
+        TSystemVectorType mStageUnbalance;
+        bool              mIsStageUnbalanceInitialized = false;
+        double            mStageStartTime              = 0.0;
 
         double GetCurrentLoadFraction(const ProcessInfo& rProcessInfo) const
         {
-  
             const double t0 = rProcessInfo[START_TIME];
             const double t1 = rProcessInfo[END_TIME];
             const double t = rProcessInfo[TIME];
             const double dt = t1 - t0;
-            return (std::abs(dt) > 0.0) ? (t - t0) / dt : 1.0;
+            return (std::abs(dt) > 0.0) ? std::clamp((t - t0) / dt, 0.0, 1.0) : 1.0;
+        }
+
+        void InitializeStageUnbalanceIfNeeded(std::size_t SystemSize)
+        {
+            const double stage_start_time = BaseType::GetModelPart().GetProcessInfo()[START_TIME];
+            if (mIsStageUnbalanceInitialized && mStageStartTime == stage_start_time &&
+                mStageUnbalance.size() == SystemSize) {
+                return;
+            }
+
+            // Evaluated for the (converged) state at the start of the stage, before any iteration. After a
+            // cut back of the first step, the state is reset, so the stored unbalance remains valid.
+            mStageUnbalance.resize(SystemSize, false);
+            BuildUnbalancedReducedResidual(mStageUnbalance);
+            mStageStartTime              = stage_start_time;
+            mIsStageUnbalanceInitialized = true;
+        }
+
+        /// Removes the part of the stage unbalance that is not yet applied in the current step
+        void ApplyLoadFraction(TSystemVectorType& rb) const
+        {
+            const double load_fraction =
+                this->GetCurrentLoadFraction(BaseType::GetModelPart().GetProcessInfo());
+
+            std::cout << "load fraction: " << load_fraction << std::endl;
+
+            if (mIsStageUnbalanceInitialized && mStageUnbalance.size() == rb.size()) {
+                TSparseSpace::UnaliasedAdd(rb, load_fraction - 1.0, mStageUnbalance);
+            }
         }
 
         void UpdateBroydenRank(TSystemMatrixType& rA_0, const TSystemVectorType& rDx, const TSystemVectorType& rDb)
@@ -324,12 +376,11 @@ namespace Kratos
 
             // Build raw A and b together (ApplyConstraints needs the raw b to form T^T b consistently).
             p_builder_and_solver->Build(p_scheme, r_model_part, rA_0, rb);
-            double load_fraction = this->GetCurrentLoadFraction(r_model_part.GetProcessInfo()); // ensure the load fraction is up to date
-            rb *= load_fraction;
             if (!r_model_part.MasterSlaveConstraints().empty()) {
                 p_builder_and_solver->ApplyConstraints(p_scheme, r_model_part, rA_0, rb); // A <- T^T A T ; b <- T^T b ; builds mT
             }
             p_builder_and_solver->ApplyDirichletConditions(p_scheme, r_model_part, rA_0, rDx, rb);
+            this->ApplyLoadFraction(rb);
 
             mpLinearSolver->InitializeSolutionStep(rA_0, rDx, rb); // factorize rA_0
 
@@ -337,7 +388,15 @@ namespace Kratos
         }
 
         /// Builds the residual and reduces it to the constrained space: b_hat = T^T b (slaves zeroed).
+        /// Only the load fraction of the stage unbalance is included.
         void BuildReducedResidual(TSystemVectorType& rb)
+        {
+            BuildUnbalancedReducedResidual(rb);
+            this->ApplyLoadFraction(rb);
+        }
+
+        /// Builds the full residual f_ext - f_int and reduces it to the constrained space
+        void BuildUnbalancedReducedResidual(TSystemVectorType& rb)
         {
             auto       p_builder_and_solver = MotherType::GetBuilderAndSolver();
             auto       p_scheme = MotherType::GetScheme();
@@ -348,11 +407,6 @@ namespace Kratos
             // note that BuildRHS also applies the Dirichlet conditions on the RHS
             p_builder_and_solver->BuildRHS(p_scheme, r_model_part, rb);
 
-			double load_fraction = this->GetCurrentLoadFraction(r_model_part.GetProcessInfo()); // ensure the load fraction is up to date
-
-			std::cout << "load fraction: " << load_fraction << std::endl;
-			rb *= load_fraction;
-
             if (!r_model_part.MasterSlaveConstraints().empty()) {
                 p_builder_and_solver->ApplyRHSConstraints(p_scheme, r_model_part, rb);
             }
@@ -362,20 +416,20 @@ namespace Kratos
         {
             auto p_builder_and_solver = MotherType::GetBuilderAndSolver();
 
-			double relaxation_factor = 1.5;
-
-			TSystemVectorType rDx_relaxed(rDx.size());
-            TSparseSpace::Copy(rDx, rDx_relaxed);
-            rDx_relaxed /= relaxation_factor; // apply relaxation to the update step
+            // Relax the increment in place, such that rDx holds the increment that is actually applied.
+            // The secant pair (rDx, delta_b) and the convergence criteria then use the applied increment.
+            if (mRelaxationFactor != 1.0) {
+                TSparseSpace::InplaceMult(rDx, mRelaxationFactor);
+            }
 
             if (HasConstraints) {
                 auto& rT = p_builder_and_solver->GetConstraintRelationMatrix();
-                TSystemVectorType dx_full(rDx_relaxed.size());
-                TSparseSpace::Mult(rT, rDx_relaxed, dx_full); // dx_full = T * dx_reduced
+                TSystemVectorType dx_full(rDx.size());
+                TSparseSpace::Mult(rT, rDx, dx_full); // dx_full = T * dx_reduced
                 MotherType::UpdateDatabase(rA, dx_full, rb, BaseType::MoveMeshFlag());
             }
             else {
-                MotherType::UpdateDatabase(rA, rDx_relaxed, rb, BaseType::MoveMeshFlag());
+                MotherType::UpdateDatabase(rA, rDx, rb, BaseType::MoveMeshFlag());
             }
         }
 

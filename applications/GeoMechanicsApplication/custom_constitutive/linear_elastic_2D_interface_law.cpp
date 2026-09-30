@@ -36,6 +36,11 @@ bool& LinearElastic2DInterfaceLaw::GetValue(const Variable<bool>& rThisVariable,
     return rValue;
 }
 
+std::optional<Geo::StressPointType> LinearElastic2DInterfaceLaw::GetStressPointType() const
+{
+    return Geo::StressPointType::Interface;
+}
+
 void LinearElastic2DInterfaceLaw::GetLawFeatures(Features& rFeatures)
 {
     // Set the type of law
