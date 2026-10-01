@@ -157,7 +157,7 @@ bool PostCriteria(CriteriaType& rCriteria, ModelPart& rModelPart)
 namespace Kratos::Testing
 {
 
-KRATOS_TEST_CASE_IN_SUITE(GeoLocalErrorCriteria_DefaultSettingsFollowPlaxisDefaults, KratosGeoMechanicsFastSuite)
+KRATOS_TEST_CASE_IN_SUITE(GeoLocalErrorCriteria_HasExpectedDefaultSettings, KratosGeoMechanicsFastSuite)
 {
     // Act
     const auto criteria = CriteriaType{};

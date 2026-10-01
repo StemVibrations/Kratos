@@ -263,4 +263,95 @@ KRATOS_TEST_CASE_IN_SUITE(LinearElastic2DBeamLaw_DoesNotTakePartInLocalErrorCrit
     KRATOS_EXPECT_FALSE(LinearElastic2DBeamLaw{}.GetStressPointType().has_value())
 }
 
+KRATOS_TEST_CASE_IN_SUITE(MohrCoulombWithTensionCutOff_StrainEnergyIncrementsOfElasticStressPointAreEqual,
+                          KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Arrange
+    const auto properties = MakeMohrCoulombProperties();
+    auto       parameters = ConstitutiveLaw::Parameters{};
+    parameters.SetMaterialProperties(properties);
+    parameters.Set(ConstitutiveLaw::COMPUTE_STRESS);
+    auto law = MohrCoulombWithTensionCutOff{std::make_unique<PlaneStrain>()};
+    InitializeLawWithZeroState(law, parameters, 4);
+    const auto strain_vector = UblasUtilities::CreateVector({-1.0e-3, -2.0e-3, 0.0, 0.0});
+
+    // Act
+    const auto stress_vector = CalculateStress(law, parameters, strain_vector);
+    const auto data          = law.CalculateLocalErrorData(parameters);
+
+    // Assert
+    const auto expected_strain_energy_increment = inner_prod(strain_vector, stress_vector);
+    KRATOS_EXPECT_GT(expected_strain_energy_increment, 0.0);
+    KRATOS_EXPECT_NEAR(data.TotalStrainEnergyIncrement, expected_strain_energy_increment, Defaults::absolute_tolerance);
+    KRATOS_EXPECT_NEAR(data.ElasticStrainEnergyIncrement, expected_strain_energy_increment, Defaults::absolute_tolerance);
+}
+
+KRATOS_TEST_CASE_IN_SUITE(MohrCoulombWithTensionCutOff_TotalStrainEnergyIncrementOfPlasticStressPointIsBelowElasticOne,
+                          KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Arrange
+    const auto properties = MakeMohrCoulombProperties();
+    auto       parameters = ConstitutiveLaw::Parameters{};
+    parameters.SetMaterialProperties(properties);
+    parameters.Set(ConstitutiveLaw::COMPUTE_STRESS);
+    auto law = MohrCoulombWithTensionCutOff{std::make_unique<PlaneStrain>()};
+    InitializeLawWithZeroState(law, parameters, 4);
+    const auto strain_vector = UblasUtilities::CreateVector({0.0, -0.01, 0.0, 0.06});
+
+    // Act
+    const auto stress_vector = CalculateStress(law, parameters, strain_vector);
+    const auto data          = law.CalculateLocalErrorData(parameters);
+
+    // Assert: the increments are taken with respect to the (zero) state at the start of the step
+    const auto elastic_matrix = PlaneStrain{}.CalculateElasticMatrix(properties);
+    KRATOS_EXPECT_TRUE(data.IsPlastic)
+    KRATOS_EXPECT_NEAR(data.TotalStrainEnergyIncrement, inner_prod(strain_vector, stress_vector), 1.0e-9);
+    KRATOS_EXPECT_NEAR(data.ElasticStrainEnergyIncrement,
+                       inner_prod(strain_vector, prod(elastic_matrix, strain_vector)), 1.0e-9);
+    KRATOS_EXPECT_LT(data.TotalStrainEnergyIncrement, data.ElasticStrainEnergyIncrement);
+}
+
+KRATOS_TEST_CASE_IN_SUITE(MohrCoulombWithTensionCutOff_ImposedStressHasNoStrainEnergyIncrements,
+                          KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Arrange
+    const auto properties = MakeMohrCoulombProperties();
+    auto       parameters = ConstitutiveLaw::Parameters{};
+    parameters.SetMaterialProperties(properties);
+    parameters.Set(ConstitutiveLaw::COMPUTE_STRESS);
+    auto law = MohrCoulombWithTensionCutOff{std::make_unique<PlaneStrain>()};
+    InitializeLawWithZeroState(law, parameters, 4);
+    CalculateStress(law, parameters, UblasUtilities::CreateVector({0.0, -0.01, 0.0, 0.06}));
+
+    // Act
+    law.SetValue(CAUCHY_STRESS_VECTOR, UblasUtilities::CreateVector({-10.0, -20.0, -10.0, 1.0}), ProcessInfo{});
+    const auto data = law.CalculateLocalErrorData(parameters);
+
+    // Assert
+    KRATOS_EXPECT_DOUBLE_EQ(data.TotalStrainEnergyIncrement, 0.0);
+    KRATOS_EXPECT_DOUBLE_EQ(data.ElasticStrainEnergyIncrement, 0.0);
+}
+
+KRATOS_TEST_CASE_IN_SUITE(GeoIncrementalLinearElasticLaw_StrainEnergyIncrementsAreEqual, KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Arrange
+    const auto properties = MakeMohrCoulombProperties();
+    auto       parameters = ConstitutiveLaw::Parameters{};
+    parameters.SetMaterialProperties(properties);
+    parameters.Set(ConstitutiveLaw::COMPUTE_STRESS);
+    auto law = GeoIncrementalLinearElasticLaw{std::make_unique<PlaneStrain>()};
+    InitializeLawWithZeroState(law, parameters, 4);
+    const auto strain_vector = UblasUtilities::CreateVector({0.0, -0.01, 0.0, 0.06});
+
+    // Act
+    const auto stress_vector = CalculateStress(law, parameters, strain_vector);
+    const auto data          = law.CalculateLocalErrorData(parameters);
+
+    // Assert
+    const auto expected_strain_energy_increment = inner_prod(strain_vector, stress_vector);
+    KRATOS_EXPECT_GT(expected_strain_energy_increment, 0.0);
+    KRATOS_EXPECT_NEAR(data.TotalStrainEnergyIncrement, expected_strain_energy_increment, 1.0e-9);
+    KRATOS_EXPECT_NEAR(data.ElasticStrainEnergyIncrement, expected_strain_energy_increment, 1.0e-9);
+}
+
 } // namespace Kratos::Testing

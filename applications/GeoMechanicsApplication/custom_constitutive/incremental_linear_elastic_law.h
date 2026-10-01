@@ -78,6 +78,8 @@ public:
     bool& GetValue(const Variable<bool>& rThisVariable, bool& rValue) override;
     using ConstitutiveLaw::GetValue;
 
+    [[nodiscard]] Geo::LocalErrorData CalculateLocalErrorData(ConstitutiveLaw::Parameters& rParameters) override;
+
     /**
      * @brief It resets all the member variables and flags
      */

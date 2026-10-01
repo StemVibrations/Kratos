@@ -145,7 +145,7 @@ void LocalErrorEvaluator::AddStressPoint(Geo::StressPointType      Type,
     };
 
     if (Type == Geo::StressPointType::Interface) {
-        // Only plastic interface points are monitored, based on their shear tractions (section 9.1.2.3)
+        // Only plastic interface points are monitored, based on their shear tractions
         if (!rData.IsPlastic) return;
 
         ++rCounts.InterfacePlastic;
@@ -157,7 +157,6 @@ void LocalErrorEvaluator::AddStressPoint(Geo::StressPointType      Type,
     }
 
     if (rData.IsPlastic) {
-        // Section 9.1.2.1
         ++rCounts.SoilPlastic;
         if (local_error_for(mSettings.MinimumReferenceStress) > mSettings.ToleratedSoilPlasticLocalError) {
             ++rCounts.InaccurateSoilPlastic;
@@ -165,7 +164,7 @@ void LocalErrorEvaluator::AddStressPoint(Geo::StressPointType      Type,
         return;
     }
 
-    // Section 9.1.2.2: all elastic points count towards the total number of elastic points, but only
+    // All elastic points count towards the total number of elastic points, but only
     // non-linear elastic points (i.e. those with a stress-dependent stiffness) can be inaccurate
     ++rCounts.SoilElastic;
     constexpr auto reference_pressure_divisor = 200.0;

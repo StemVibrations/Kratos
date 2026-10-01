@@ -951,11 +951,15 @@ Geo::LocalErrorData SmallStrainUDSMLaw::CalculateLocalErrorData(Parameters& rPar
     std::copy_n(mDeltaStrainVector.begin(), VOIGT_SIZE_3D, strain_increment_vector.begin());
     std::copy_n(mStressVector.begin(), VOIGT_SIZE_3D, stress_vector.begin());
 
+    const Vector elastic_stress_increment = prod(elastic_matrix, strain_increment_vector);
+
     auto result                        = Geo::LocalErrorData{};
     result.IsPlastic                   = mPlasticityIndicator != 0;
     result.HasStressDependentStiffness = mAttributes[index_of_is_stress_dependent_flag] == 1;
-    result.ElasticPredictorDeviation =
-        stress_vector_at_start_of_step + prod(elastic_matrix, strain_increment_vector) - stress_vector;
+    result.ElasticPredictorDeviation = stress_vector_at_start_of_step + elastic_stress_increment - stress_vector;
+    result.TotalStrainEnergyIncrement =
+        inner_prod(strain_increment_vector, stress_vector - stress_vector_at_start_of_step);
+    result.ElasticStrainEnergyIncrement = inner_prod(strain_increment_vector, elastic_stress_increment);
     if (GetStressPointType() == Geo::StressPointType::Interface) {
         result.IndexOfFirstShearComponent = INDEX_3D_XY;
         result.MaximumShearStress = LocalErrorUtilities::CalculateShearTractionMagnitude(stress_vector, INDEX_3D_XY);

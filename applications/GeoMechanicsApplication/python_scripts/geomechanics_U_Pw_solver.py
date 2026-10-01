@@ -71,8 +71,7 @@ class UPwSolver(GeoSolver):
             "quasi_newton_type": "broyden",
             "quasi_newton_restart_interval": 50,
             "quasi_newton_max_rank" : 10,
-            "relaxation_factor"          : 0.8333333333333334,
-            "extrapolate_previous_increment": false,
+            "relaxation_factor"          : 0.8,
             "first_alpha_value"          : 0.5,
             "second_alpha_value"         : 1.0,
             "min_alpha"                  : 0.1,
@@ -223,13 +222,19 @@ class UPwSolver(GeoSolver):
         if convergence_criterion.lower() == "water_pressure_criterion":
             return self._MakeWaterPressureCriterion()
 
+        if convergence_criterion.lower() == "global_force_error_criterion":
+            return self._MakeGlobalForceErrorCriterion()
+
+        if convergence_criterion.lower() == "global_force_error_and_water_pressure_criterion":
+            return KratosMultiphysics.AndCriteria(self._MakeGlobalForceErrorCriterion(), self._MakeWaterPressureCriterion())
+
         if convergence_criterion.lower() == "displacement_and_water_pressure_criterion":
             d_and_pw_convergence_criterion = KratosMultiphysics.MixedGenericCriteria([(self._MakeDisplacementCriterion()),(self._MakeWaterPressureCriterion())])
             d_and_pw_convergence_criterion.SetEchoLevel(self.settings["echo_level"].GetInt())
             return d_and_pw_convergence_criterion
 
         err_msg =  "The requested convergence criterion \"" + convergence_criterion + "\" is not available!\n"
-        err_msg += "Available options are: \"displacement_criterion\", \"residual_criterion\", \"and_criterion\", \"or_criterion\", \"water_pressure_criterion\", \"displacement_and_water_pressure_criterion\""
+        err_msg += "Available options are: \"displacement_criterion\", \"residual_criterion\", \"and_criterion\", \"or_criterion\", \"water_pressure_criterion\", \"displacement_and_water_pressure_criterion\", \"global_force_error_criterion\", \"global_force_error_and_water_pressure_criterion\""
         raise RuntimeError(err_msg)
 
     def _MakeDisplacementCriterion(self):

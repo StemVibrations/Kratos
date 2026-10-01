@@ -24,8 +24,6 @@ namespace Kratos
 namespace Geo
 {
 
-// The kind of stress point, as distinguished by the local error criteria (see e.g. section 9.1.2
-// "Local error criteria" of the PLAXIS Scientific Manual)
 enum class StressPointType { Soil, Interface };
 
 // The state of a single stress point that is required to evaluate its local error indicator
@@ -48,7 +46,7 @@ struct LocalErrorData {
 
     // The index of the first shear component of the stress vector. For interfaces, only the shear
     // components (i.e. the components from this index onwards) are taken into account by the local
-    // error (see section 9.1.2.3 of the PLAXIS Scientific Manual). Zero means all components.
+    // error. Zero means all components.
     std::size_t IndexOfFirstShearComponent = 0;
 
     // The maximum shear stress of the constitutive stress (soil: the radius of the largest Mohr
@@ -56,6 +54,15 @@ struct LocalErrorData {
     double MaximumShearStress = 0.0;
 
     double Cohesion = 0.0;
+
+    // The strain energy increments (per unit volume) of the current step, which define the current
+    // stiffness parameter of the global error criterion:
+    //     total:   delta_eps . delta_sigma
+    //     elastic: delta_eps . D^e delta_eps
+    // where delta_eps and delta_sigma are the strain and stress increments with respect to the start
+    // of the step. Both are zero when the law does not provide them.
+    double TotalStrainEnergyIncrement   = 0.0;
+    double ElasticStrainEnergyIncrement = 0.0;
 };
 
 } // namespace Geo

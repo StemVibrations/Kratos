@@ -173,7 +173,8 @@ MohrCoulombWithTensionCutOff::MohrCoulombWithTensionCutOff(std::unique_ptr<Const
       mStressVector(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
       mStressVectorFinalized(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
       mStrainVectorFinalized(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
-      mTrialStressVector(ZeroVector(mpConstitutiveDimension->GetStrainSize()))
+      mTrialStressVector(ZeroVector(mpConstitutiveDimension->GetStrainSize())),
+      mDeltaStrainVector(ZeroVector(mpConstitutiveDimension->GetStrainSize()))
 {
 }
 
@@ -185,6 +186,7 @@ ConstitutiveLaw::Pointer MohrCoulombWithTensionCutOff::Clone() const
     p_result->mStrainVectorFinalized        = mStrainVectorFinalized;
     p_result->mCoulombWithTensionCutOffImpl = mCoulombWithTensionCutOffImpl;
     p_result->mTrialStressVector            = mTrialStressVector;
+    p_result->mDeltaStrainVector            = mDeltaStrainVector;
     p_result->mIsPlastic                    = mIsPlastic;
     return p_result;
 }
@@ -215,6 +217,7 @@ void MohrCoulombWithTensionCutOff::SetValue(const Variable<Vector>& rVariable,
         mStressVector = rValue;
         // A stress state that is imposed from outside is regarded as an elastic state
         mTrialStressVector = rValue;
+        mDeltaStrainVector = ZeroVector(rValue.size());
         mIsPlastic         = false;
     } else {
         KRATOS_ERROR << "Can't set value of " << rVariable.Name() << ": unsupported variable\n";
@@ -306,6 +309,7 @@ void MohrCoulombWithTensionCutOff::CalculateMaterialResponseCauchy(ConstitutiveL
     const auto elastic_matrix = mpConstitutiveDimension->CalculateElasticMatrix(r_properties);
 
     const Vector total_strain_increment = rParameters.GetStrainVector() - mStrainVectorFinalized;
+    mDeltaStrainVector                  = total_strain_increment;
 
     // Full elastic predictor over the entire strain increment.
     const Vector full_trial_stress_vector =
@@ -428,6 +432,12 @@ Geo::LocalErrorData MohrCoulombWithTensionCutOff::CalculateLocalErrorData(Consti
                                            : Vector{ZeroVector(mStressVector.size())};
     result.MaximumShearStress = LocalErrorUtilities::CalculateMaximumShearStress(mStressVector);
     result.Cohesion = LocalErrorUtilities::GetCohesionIfAvailable(rParameters.GetMaterialProperties());
+    if (mDeltaStrainVector.size() == mStressVector.size() && mTrialStressVector.size() == mStressVector.size()) {
+        // The elastic predictor of the step is sigma_0 + D^e delta_eps
+        result.TotalStrainEnergyIncrement = inner_prod(mDeltaStrainVector, mStressVector - mStressVectorFinalized);
+        result.ElasticStrainEnergyIncrement =
+            inner_prod(mDeltaStrainVector, mTrialStressVector - mStressVectorFinalized);
+    }
     return result;
 }
 

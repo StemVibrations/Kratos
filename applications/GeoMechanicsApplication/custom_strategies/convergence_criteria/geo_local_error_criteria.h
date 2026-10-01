@@ -27,7 +27,7 @@ namespace Kratos
  * @class GeoLocalErrorCriteria
  * @ingroup GeoMechanicsApplication
  * @brief Convergence criterion based on the local error indicators of the stress points
- * @details Implements the local error criteria of section 9.1.2 of the PLAXIS Scientific Manual:
+ * @details Implements the local error criteria:
  * the number of inaccurate plastic soil points, inaccurate non-linear elastic soil points and
  * inaccurate plastic interface points must each remain below a tolerated number. This criterion
  * does not check global equilibrium, so it is meant to be combined with a global criterion (e.g.

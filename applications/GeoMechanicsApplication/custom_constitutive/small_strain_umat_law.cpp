@@ -853,7 +853,8 @@ Geo::LocalErrorData SmallStrainUMATLaw<TVoigtSize>::CalculateLocalErrorData(Cons
     std::copy_n(mStressVectorFinalized.begin(), TVoigtSize, stress_vector_at_start_of_step.begin());
     std::copy_n(mDeltaStrainVector.begin(), TVoigtSize, strain_increment_vector.begin());
     std::copy_n(mStressVector.begin(), TVoigtSize, stress_vector.begin());
-    const Vector elastic_predictor = stress_vector_at_start_of_step + prod(stiffness_matrix, strain_increment_vector);
+    const Vector elastic_stress_increment = prod(stiffness_matrix, strain_increment_vector);
+    const Vector elastic_predictor        = stress_vector_at_start_of_step + elastic_stress_increment;
 
     auto result      = Geo::LocalErrorData{};
     result.IsPlastic = LocalErrorUtilities::DeviatesFromElasticPredictor(elastic_predictor, stress_vector);
@@ -861,6 +862,9 @@ Geo::LocalErrorData SmallStrainUMATLaw<TVoigtSize>::CalculateLocalErrorData(Cons
     // points are regarded as plastic, since their stresses deviate from the elastic predictor.
     result.HasStressDependentStiffness = false;
     result.ElasticPredictorDeviation   = elastic_predictor - stress_vector;
+    result.TotalStrainEnergyIncrement =
+        inner_prod(strain_increment_vector, stress_vector - stress_vector_at_start_of_step);
+    result.ElasticStrainEnergyIncrement = inner_prod(strain_increment_vector, elastic_stress_increment);
     // The shear components follow the normal components
     if (GetStressPointType() == Geo::StressPointType::Interface) {
         result.IndexOfFirstShearComponent = mpConstitutiveDimension->GetNumberOfNormalComponents();

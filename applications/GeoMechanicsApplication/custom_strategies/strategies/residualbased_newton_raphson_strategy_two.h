@@ -21,8 +21,11 @@
 #include "includes/kratos_parameters.h"
 #include "includes/model_part.h"
 #include "solving_strategies/strategies/residualbased_newton_raphson_strategy.h"
+#include "utilities/atomic_utilities.h"
+#include "utilities/parallel_utilities.h"
 
 // Application includes
+#include "custom_strategies/convergence_criteria/geo_global_force_error_criteria.h"
 #include "geo_mechanics_application_variables.h"
 
 namespace Kratos
@@ -40,6 +43,7 @@ namespace Kratos
         using BaseType = ImplicitSolvingStrategy<TSparseSpace, TDenseSpace, TLinearSolver>;
         using MotherType = ResidualBasedNewtonRaphsonStrategy<TSparseSpace, TDenseSpace, TLinearSolver>;
         using TConvergenceCriteriaType = ConvergenceCriteria<TSparseSpace, TDenseSpace>;
+        using GlobalForceErrorCriteriaType = GeoGlobalForceErrorCriteria<TSparseSpace, TDenseSpace>;
         using TBuilderAndSolverType = typename BaseType::TBuilderAndSolverType;
         using TSchemeType = typename BaseType::TSchemeType;
         using DofsArrayType = typename BaseType::DofsArrayType;
@@ -83,8 +87,7 @@ namespace Kratos
                     "quasi_newton_type": "broyden",
                     "quasi_newton_restart_interval": 50,
                     "quasi_newton_max_rank" : 10,
-                        "extrapolate_previous_increment": false,
-                        "relaxation_factor": 0.8333333333333334
+                    "relaxation_factor": 0.8
 
                 }  )");
 
@@ -121,6 +124,18 @@ namespace Kratos
             }  )");
 
             mpLinearSolver = LinearSolverFactoryType().Create(linear_solver_settings);
+
+            mpGlobalForceErrorCriteria =
+                std::dynamic_pointer_cast<GlobalForceErrorCriteriaType>(pNewConvergenceCriteria);
+        }
+
+        /// Links the global force error criterion, which needs the reference forces that this strategy
+        /// provides. This is only needed when the criterion is part of a combined criterion (e.g. an
+        /// AndCriteria), since a global force error criterion that is passed directly to the
+        /// constructor is linked automatically. It must be called before the first step of a stage.
+        void SetGlobalForceErrorCriteria(typename GlobalForceErrorCriteriaType::Pointer pGlobalForceErrorCriteria)
+        {
+            mpGlobalForceErrorCriteria = pGlobalForceErrorCriteria;
         }
 
         bool SolveSolutionStep() override
@@ -187,6 +202,7 @@ namespace Kratos
                 p_scheme->FinalizeNonLinIteration(r_model_part, rA, rDx, rb);
                 mpConvergenceCriteria->FinalizeNonLinearIteration(r_model_part, r_dof_set, rA, rDx, rb);
 
+                this->SetReferenceForcesOfGlobalForceErrorCriteria(rb);
                 is_converged = mpConvergenceCriteria->PostCriteria(r_model_part, r_dof_set, rA, rDx, rb);
                 if (is_converged) {
                     break;
@@ -267,6 +283,12 @@ namespace Kratos
         bool              mIsStageUnbalanceInitialized = false;
         double            mStageStartTime              = 0.0;
 
+        // The global force error criterion (if any), which compares the residual with the internal
+        // forces at the start of the stage (in the constrained space), i.e. the external forces that
+        // were already in equilibrium at the start of the stage (f_ext^inact)
+        typename GlobalForceErrorCriteriaType::Pointer mpGlobalForceErrorCriteria;
+        TSystemVectorType                              mStageStartInternalForces;
+
         double GetCurrentLoadFraction(const ProcessInfo& rProcessInfo) const
         {
             const double t0 = rProcessInfo[START_TIME];
@@ -288,6 +310,10 @@ namespace Kratos
             // cut back of the first step, the state is reset, so the stored unbalance remains valid.
             mStageUnbalance.resize(SystemSize, false);
             BuildUnbalancedReducedResidual(mStageUnbalance);
+            if (mpGlobalForceErrorCriteria) {
+                mStageStartInternalForces.resize(SystemSize, false);
+                BuildReducedInternalForces(mStageStartInternalForces);
+            }
             mStageStartTime              = stage_start_time;
             mIsStageUnbalanceInitialized = true;
         }
@@ -302,6 +328,71 @@ namespace Kratos
 
             if (mIsStageUnbalanceInitialized && mStageUnbalance.size() == rb.size()) {
                 TSparseSpace::UnaliasedAdd(rb, load_fraction - 1.0, mStageUnbalance);
+            }
+        }
+
+        /// Provides the global force error criterion (if any) with the forces it compares the residual rb with
+        void SetReferenceForcesOfGlobalForceErrorCriteria(const TSystemVectorType& rb) const
+        {
+            if (!mpGlobalForceErrorCriteria) return;
+
+            // Since rb = f_ext - f_int - (1 - load_fraction) * r_stage and r_stage = f_ext - f_int,0, the
+            // internal forces that developed in the stage so far are f_int - f_int,0 = load_fraction * r_stage - rb
+            TSystemVectorType active_internal_forces(rb.size());
+            TSparseSpace::SetToZero(active_internal_forces);
+            if (mIsStageUnbalanceInitialized && mStageUnbalance.size() == rb.size()) {
+                const double load_fraction =
+                    this->GetCurrentLoadFraction(BaseType::GetModelPart().GetProcessInfo());
+                TSparseSpace::Assign(active_internal_forces, load_fraction, mStageUnbalance);
+            }
+            TSparseSpace::UnaliasedAdd(active_internal_forces, -1.0, rb);
+
+            mpGlobalForceErrorCriteria->SetReferenceForces(mStageStartInternalForces, active_internal_forces);
+        }
+
+        /// Builds the internal forces f_int = f_ext - (f_ext - f_int) of the active elements and reduces
+        /// them to the constrained space, consistent with the residual. The external forces of an element
+        /// are its EXTERNAL_FORCES_VECTOR (e.g. its self weight); elements that don't provide these are
+        /// regarded as unloaded.
+        void BuildReducedInternalForces(TSystemVectorType& rInternalForces)
+        {
+            auto        p_builder_and_solver = MotherType::GetBuilderAndSolver();
+            auto        p_scheme             = MotherType::GetScheme();
+            ModelPart&  r_model_part         = BaseType::GetModelPart();
+            const auto& r_process_info       = r_model_part.GetProcessInfo();
+            const auto  system_size          = TSparseSpace::Size(rInternalForces);
+
+            TSparseSpace::SetToZero(rInternalForces);
+
+            struct ElementForcesTLS {
+                Vector                        RightHandSide;
+                Vector                        ExternalForces;
+                Element::EquationIdVectorType EquationIds;
+            };
+            block_for_each(r_model_part.Elements(), ElementForcesTLS{}, [&](Element& rElement, ElementForcesTLS& rTLS) {
+                if (!rElement.IsActive()) return;
+
+                p_scheme->CalculateRHSContribution(rElement, rTLS.RightHandSide, rTLS.EquationIds, r_process_info);
+                rTLS.ExternalForces.resize(0, false);
+                rElement.Calculate(EXTERNAL_FORCES_VECTOR, rTLS.ExternalForces, r_process_info);
+                const auto has_external_forces = rTLS.ExternalForces.size() == rTLS.RightHandSide.size();
+
+                for (std::size_t i = 0; i < rTLS.EquationIds.size(); ++i) {
+                    // The elimination builder numbers the fixed degrees of freedom beyond the system size
+                    if (rTLS.EquationIds[i] >= system_size) continue;
+
+                    const auto external_force = has_external_forces ? rTLS.ExternalForces[i] : 0.0;
+                    AtomicAdd(rInternalForces[rTLS.EquationIds[i]], external_force - rTLS.RightHandSide[i]);
+                }
+            });
+
+            for (const auto& r_dof : p_builder_and_solver->GetDofSet()) {
+                if (r_dof.IsFixed() && r_dof.EquationId() < system_size) {
+                    rInternalForces[r_dof.EquationId()] = 0.0;
+                }
+            }
+            if (!r_model_part.MasterSlaveConstraints().empty()) {
+                p_builder_and_solver->ApplyRHSConstraints(p_scheme, r_model_part, rInternalForces);
             }
         }
 

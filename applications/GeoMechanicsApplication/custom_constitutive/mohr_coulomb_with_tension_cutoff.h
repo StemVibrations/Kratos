@@ -74,9 +74,11 @@ private:
     CoulombWithTensionCutOffImpl              mCoulombWithTensionCutOffImpl;
     bool                                      mIsModelInitialized = false;
 
-    // Transient data of the most recent stress calculation, used by the local error criteria:
-    // the elastic predictor of the whole step and whether plastic flow occurred in the step
+    // Transient data of the most recent stress calculation, used by the local and global error
+    // criteria: the elastic predictor and the strain increment of the whole step and whether plastic
+    // flow occurred in the step
     Vector mTrialStressVector;
+    Vector mDeltaStrainVector;
     bool   mIsPlastic = false;
 
     [[nodiscard]] Vector CalculateTrialStressVector(const Vector& rStrainVector, const Properties& rProperties) const;

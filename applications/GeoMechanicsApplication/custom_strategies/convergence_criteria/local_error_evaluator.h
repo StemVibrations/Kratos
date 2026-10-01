@@ -27,10 +27,10 @@ class Element;
 class ModelPart;
 class ProcessInfo;
 
-// Evaluates the local error criteria of section 9.1.2 of the PLAXIS Scientific Manual:
-//  - inaccurate plastic points for soil elements (9.1.2.1),
-//  - non-linear inaccurate elastic points for soil elements (9.1.2.2),
-//  - inaccurate plastic points for interfaces (9.1.2.3).
+// Evaluates the local error criteria:
+//  - inaccurate plastic points for soil elements,
+//  - non-linear inaccurate elastic points for soil elements,
+//  - inaccurate plastic points for interfaces.
 //
 // A stress point j is inaccurate when || sigma_eq,j - sigma_c,j || / max(tau_max,j, c, sigma_ref)
 // exceeds the tolerated local error, where sigma_eq,j = sigma_c,j-1 + D^e delta_eps_j is the

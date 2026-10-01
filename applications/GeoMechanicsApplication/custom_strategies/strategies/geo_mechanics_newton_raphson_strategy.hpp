@@ -92,8 +92,7 @@ public:
                     "quasi_newton_type": "broyden",
                     "quasi_newton_restart_interval": 50,
                     "quasi_newton_max_rank" : 10,
-                    "relaxation_factor" : 0.8333333333333334,
-                    "extrapolate_previous_increment" : false
+                    "relaxation_factor" : 0.8
                 }  )");
 
         // Validate against defaults -- this also ensures no type mismatch

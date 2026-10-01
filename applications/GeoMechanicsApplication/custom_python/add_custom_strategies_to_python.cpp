@@ -26,6 +26,7 @@
 #include "custom_strategies/strategies/residualbased_newton_raphson_strategy_two.h"
 
 // convergence criteria
+#include "custom_strategies/convergence_criteria/geo_global_force_error_criteria.h"
 #include "custom_strategies/convergence_criteria/geo_local_error_criteria.h"
 
 // builders and solvers
@@ -136,13 +137,16 @@ void AddCustomStrategiesToPython(const pybind11::module& m)
     py::class_<GeoMechanicsNewtonRaphsonStrategyType, typename GeoMechanicsNewtonRaphsonStrategyType::Pointer, BaseSolvingStrategyType>(
         m, "GeoMechanicsNewtonRaphsonStrategy")
         .def(py::init<ModelPart&, BaseSchemeType::Pointer, ConvergenceCriteriaType::Pointer,
-                      BuilderAndSolverType::Pointer, Parameters&, int, bool, bool, bool, bool>());
+                      BuilderAndSolverType::Pointer, Parameters&, int, bool, bool, bool, bool>())
+        .def("SetGlobalForceErrorCriteria", &GeoMechanicsNewtonRaphsonStrategyType::SetGlobalForceErrorCriteria);
 
     py::class_<GeoMechanicsNewtonRaphsonErosionProcessStrategyType,
                typename GeoMechanicsNewtonRaphsonErosionProcessStrategyType::Pointer, BaseSolvingStrategyType>(
         m, "GeoMechanicsNewtonRaphsonErosionProcessStrategy")
         .def(py::init<ModelPart&, BaseSchemeType::Pointer, ConvergenceCriteriaType::Pointer,
-                      BuilderAndSolverType::Pointer, Parameters&, int, bool, bool, bool>());
+                      BuilderAndSolverType::Pointer, Parameters&, int, bool, bool, bool>())
+        .def("SetGlobalForceErrorCriteria",
+             &GeoMechanicsNewtonRaphsonErosionProcessStrategyType::SetGlobalForceErrorCriteria);
 
     py::class_<GeoMechanicNewtonRaphsonStrategyLinearElasticDynamicType,
                typename GeoMechanicNewtonRaphsonStrategyLinearElasticDynamicType::Pointer, BaseSolvingStrategyType>(
@@ -153,6 +157,12 @@ void AddCustomStrategiesToPython(const pybind11::module& m)
     using GeoLocalErrorCriteriaType = GeoLocalErrorCriteria<SparseSpaceType, LocalSpaceType>;
     py::class_<GeoLocalErrorCriteriaType, typename GeoLocalErrorCriteriaType::Pointer, ConvergenceCriteriaType>(
         m, "GeoLocalErrorCriteria")
+        .def(py::init<>())
+        .def(py::init<Parameters>());
+
+    using GeoGlobalForceErrorCriteriaType = GeoGlobalForceErrorCriteria<SparseSpaceType, LocalSpaceType>;
+    py::class_<GeoGlobalForceErrorCriteriaType, typename GeoGlobalForceErrorCriteriaType::Pointer, ConvergenceCriteriaType>(
+        m, "GeoGlobalForceErrorCriteria")
         .def(py::init<>())
         .def(py::init<Parameters>());
 
