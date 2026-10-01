@@ -602,6 +602,9 @@ void KratosGeoMechanicsApplication::Register()
     KRATOS_REGISTER_VARIABLE(GEO_SHEAR_CAPACITY)
     KRATOS_REGISTER_VARIABLE(GEO_PLASTICITY_STATUS)
 
+    KRATOS_REGISTER_VARIABLE(INACCURATE_PLASTIC_POINTS)
+    KRATOS_REGISTER_VARIABLE(N_PLASTIC_POINTS)
+
     Serializer::Register("PlaneStrain", PlaneStrain{});
     Serializer::Register("PlaneStrainStressState", PlaneStrainStressState{});
     Serializer::Register("SaturatedBelowPhreaticLevelLaw", SaturatedBelowPhreaticLevelLaw{});

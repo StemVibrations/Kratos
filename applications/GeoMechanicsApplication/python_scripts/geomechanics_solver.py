@@ -90,6 +90,10 @@ class GeoMechanicalSolver(PythonSolver):
             "strategy_type": "newton_raphson",
             "max_piping_iterations": 50,
             "convergence_criterion": "Displacement_criterion",
+            "use_local_error_criteria": false,
+            "local_error_criteria_settings": {},
+            "global_force_error_criterion_settings": {},
+            "deactivate_unsupported_interfaces": true,
             "water_pressure_relative_tolerance": 1.0e-4,
             "water_pressure_absolute_tolerance": 1.0e-9,
             "displacement_relative_tolerance": 1.0e-4,
@@ -116,6 +120,8 @@ class GeoMechanicalSolver(PythonSolver):
             "prebuild_dynamics"          : false,
             "initialize_acceleration"    : false,
             "search_neighbours_step"     : false,
+            "use_old_stiffness_in_first_iteration" : false,
+            "read_force": false,
             "linear_solver_settings":{
                 "solver_type": "amgcl",
                 "tolerance": 1.0e-6,
@@ -222,6 +228,11 @@ class GeoMechanicalSolver(PythonSolver):
         """Perform initialization after adding nodal variables and dofs to the main model part. """
         self.computing_model_part = self.GetComputingModelPart()
 
+        # Interfaces that lost the support at one of their sides (e.g. due to an excavation) can't
+        # transfer any traction, so they are deactivated before the stage is solved
+        if self.settings["deactivate_unsupported_interfaces"].GetBool():
+            self._DeactivateUnsupportedInterfaces()
+
         # Fill the previous steps of the buffer with the initial conditions
         self._FillBuffer()
 
@@ -235,10 +246,15 @@ class GeoMechanicalSolver(PythonSolver):
         self.scheme = self._BaseConstructScheme()
 
         # Get the convergence criterion
+        self.global_force_error_criterion = None
         self.convergence_criterion = self._ConstructConvergenceCriterion(self.settings["convergence_criterion"].GetString())
+        if self.settings["use_local_error_criteria"].GetBool():
+            self.convergence_criterion = self._AddLocalErrorCriterion(self.convergence_criterion)
 
         self.solving_strategy = self._create_solving_strategy(self.builder_and_solver,
                                                               self.settings["strategy_type"].GetString())
+        if self.global_force_error_criterion is not None:
+            self._LinkGlobalForceErrorCriterion()
 
         # Set echo_level
         self.SetEchoLevel(self.settings["echo_level"].GetInt())
@@ -257,6 +273,7 @@ class GeoMechanicalSolver(PythonSolver):
 
     def InitializeSolutionStep(self):
         self.solving_strategy.InitializeSolutionStep()
+        self.main_model_part.ProcessInfo[GeoMechanicsApplication.INACCURATE_PLASTIC_POINTS] = 0
 
     def Predict(self):
         self.solving_strategy.Predict()
@@ -468,9 +485,16 @@ class GeoMechanicalSolver(PythonSolver):
         compute_reactions = self.settings["compute_reactions"].GetBool()
         reform_step_dofs  = self.settings["reform_dofs_at_each_step"].GetBool()
         move_mesh_flag    = self.settings["move_mesh_flag"].GetBool()
+        read_force        = self.settings["read_force"].GetBool() if self.settings.Has("read_force") else False
 
         if strategy_type.lower() == "newton_raphson":
             self.strategy_params = KratosMultiphysics.Parameters("{}")
+
+            self.strategy_params.AddValue("quasi_newton_type", self.settings["quasi_newton_type"])
+            self.strategy_params.AddValue("quasi_newton_restart_interval", self.settings["quasi_newton_restart_interval"])
+            self.strategy_params.AddValue("quasi_newton_max_rank", self.settings["quasi_newton_max_rank"])
+            self.strategy_params.AddValue("relaxation_factor", self.settings["relaxation_factor"])
+
             solving_strategy = GeoMechanicsApplication.GeoMechanicsNewtonRaphsonStrategy(self.computing_model_part,
                                                                                          self.scheme,
                                                                                          self.convergence_criterion,
@@ -479,7 +503,8 @@ class GeoMechanicalSolver(PythonSolver):
                                                                                          max_iterations,
                                                                                          compute_reactions,
                                                                                          reform_step_dofs,
-                                                                                         move_mesh_flag)
+                                                                                         move_mesh_flag,
+                                                                                         read_force)
         elif strategy_type.lower() == "newton_raphson_linear_elastic":
 
             # check if the solver_type, solution_type and scheme_type are set to the correct values
@@ -575,6 +600,48 @@ class GeoMechanicalSolver(PythonSolver):
         residual_criterion.SetEchoLevel(self.settings["echo_level"].GetInt())
 
         return residual_criterion
+
+    def _MakeGlobalForceErrorCriterion(self):
+        """Makes the global force error criterion. It needs the reference forces that the strategy
+        provides, so it is linked to the strategy once that has been created."""
+        criterion_settings = self.settings["global_force_error_criterion_settings"]
+        # Note that the criterion adds any missing (default) settings
+        has_own_echo_level = criterion_settings.Has("echo_level")
+        self.global_force_error_criterion = GeoMechanicsApplication.GeoGlobalForceErrorCriteria(criterion_settings)
+        if not has_own_echo_level:
+            self.global_force_error_criterion.SetEchoLevel(self.settings["echo_level"].GetInt())
+
+        return self.global_force_error_criterion
+
+    def _LinkGlobalForceErrorCriterion(self):
+        if not hasattr(self.solving_strategy, "SetGlobalForceErrorCriteria"):
+            strategy_type = self.settings["strategy_type"].GetString()
+            raise RuntimeError(f"The global force error criterion can't be used with strategy type \"{strategy_type}\". "
+                               "Use \"newton_raphson\" or \"newton_raphson_with_piping\" instead.")
+
+        self.solving_strategy.SetGlobalForceErrorCriteria(self.global_force_error_criterion)
+
+    def _DeactivateUnsupportedInterfaces(self):
+        process = GeoMechanicsApplication.DeactivateUnsupportedInterfacesProcess(self.computing_model_part)
+        process.Execute()
+        number_of_deactivated_interfaces = process.GetNumberOfDeactivatedInterfaces()
+        if number_of_deactivated_interfaces > 0:
+            KratosMultiphysics.Logger.PrintInfo(
+                "GeoMechanicalSolver",
+                f"Deactivated {number_of_deactivated_interfaces} interface element(s) without an active "
+                "element at one of their sides")
+
+    def _AddLocalErrorCriterion(self, convergence_criterion):
+        """Combines the given (global) convergence criterion with the local error criteria, i.e. both
+        need to be satisfied for convergence."""
+        local_error_criteria_settings = self.settings["local_error_criteria_settings"]
+        # Note that the criterion adds any missing (default) settings
+        has_own_echo_level = local_error_criteria_settings.Has("echo_level")
+        local_error_criterion = GeoMechanicsApplication.GeoLocalErrorCriteria(local_error_criteria_settings)
+        if not has_own_echo_level:
+            local_error_criterion.SetEchoLevel(self.settings["echo_level"].GetInt())
+
+        return KratosMultiphysics.AndCriteria(convergence_criterion, local_error_criterion)
 
     def _MakeWaterPressureCriterion(self):
         relative_tolerance = self.settings["water_pressure_relative_tolerance"].GetDouble()
