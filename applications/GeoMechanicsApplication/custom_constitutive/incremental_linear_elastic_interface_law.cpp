@@ -11,10 +11,10 @@
 //                   Anne van de Graaf
 //
 
-#include "incremental_linear_elastic_interface_law.h"
 #include "constitutive_law_dimension.h"
 #include "custom_utilities/check_utilities.hpp"
 #include "geo_mechanics_application_variables.h"
+#include "incremental_linear_elastic_interface_law.h"
 
 namespace Kratos
 {
@@ -125,6 +125,11 @@ Geo::LocalErrorData GeoIncrementalLinearElasticInterfaceLaw::CalculateLocalError
     auto result                      = Geo::LocalErrorData{};
     result.ElasticPredictorDeviation = ZeroVector(GetStrainSize());
     return result;
+}
+void GeoIncrementalLinearElasticInterfaceLaw::ResetMaterial(const Properties&, const GeometryType&, const Vector&)
+{
+    mPreviousRelativeDisplacement = ZeroVector(mPreviousRelativeDisplacement.size());
+    mPreviousTraction             = ZeroVector(mPreviousTraction.size());
 }
 
 void GeoIncrementalLinearElasticInterfaceLaw::save(Serializer& rSerializer) const

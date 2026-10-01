@@ -55,6 +55,10 @@ public:
 
     [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
     [[nodiscard]] Geo::LocalErrorData CalculateLocalErrorData(Parameters& rParameters) override;
+    /**
+    * @brief It resets all the member variables and flags
+    */
+    void ResetMaterial(const Properties&, const GeometryType&, const Vector&) override;
 
 private:
     GeoIncrementalLinearElasticInterfaceLaw() = default;
