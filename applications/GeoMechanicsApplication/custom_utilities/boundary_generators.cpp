@@ -35,7 +35,7 @@ Geometry<Node>::GeometriesArrayType FacesGenerator::operator()(const Geometry<No
         // know how to recover if the local dimension is smaller than 3, we do so here.
         if (rGeometry.LocalSpaceDimension() < 3 ) {
             Geometry<Node>::GeometriesArrayType result;
-            result.push_back(std::make_shared<Geometry<Node>>(rGeometry));
+            result.push_back(rGeometry.Create(0, rGeometry.Points()));
             return result;
         }
 
