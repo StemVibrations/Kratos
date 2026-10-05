@@ -93,6 +93,7 @@ public:
 
     void GetDofList(DofsVectorType& rElementalDofList, const ProcessInfo&) const override;
     void Initialize(const ProcessInfo& rCurrentProcessInfo) override;
+   // void FinalizeSolutionStep(const ProcessInfo& rCurrentProcessInfo) override;
     int  Check(const ProcessInfo& rCurrentProcessInfo) const override;
 
     const IntegrationScheme& GetIntegrationScheme() const;

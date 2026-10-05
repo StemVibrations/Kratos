@@ -123,6 +123,8 @@ public:
     using GeoIncrementalLinearElasticLaw::GetValue;
     bool& GetValue(const Variable<bool>& rThisVariable, bool& rValue) override;
 
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+
     ///@}
 
 protected:

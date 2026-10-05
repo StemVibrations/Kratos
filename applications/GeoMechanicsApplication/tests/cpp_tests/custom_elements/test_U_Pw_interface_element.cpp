@@ -13,6 +13,7 @@
 
 #include "custom_constitutive/incremental_linear_elastic_interface_law.h"
 #include "custom_constitutive/incremental_linear_elastic_law.h"
+#include "custom_constitutive/interface_coulomb_with_tension_cut_off.h"
 #include "custom_constitutive/interface_plane_strain.h"
 #include "custom_constitutive/interface_three_dimensional_surface.h"
 #include "custom_constitutive/plane_strain.h"
@@ -1000,6 +1001,46 @@ KRATOS_TEST_CASE_IN_SUITE(UPwLineInterfaceElement_CalculateEffectiveTractionVect
         KRATOS_EXPECT_VECTOR_RELATIVE_NEAR(r_traction, expected_traction, Defaults::relative_tolerance)
     }
 }
+
+//KRATOS_TEST_CASE_IN_SUITE(UPwLineInterfaceElement_FinalizeSolutionStepCommitsStateOfPlasticInterfaceLaw,
+//                          KratosGeoMechanicsFastSuiteWithoutKernel)
+//{
+//    // Arrange: a Coulomb interface (c = 10, phi = 30 degrees, psi = 0)
+//    constexpr auto stiffness    = 1000.0;
+//    auto           p_properties = std::make_shared<Properties>();
+//    p_properties->SetValue(INTERFACE_NORMAL_STIFFNESS, stiffness);
+//    p_properties->SetValue(INTERFACE_SHEAR_STIFFNESS, stiffness);
+//    p_properties->SetValue(GEO_COHESION, 10.0);
+//    p_properties->SetValue(GEO_FRICTION_ANGLE, 30.0);
+//    p_properties->SetValue(GEO_DILATANCY_ANGLE, 0.0);
+//    p_properties->SetValue(GEO_TENSILE_STRENGTH, 10.0);
+//    p_properties->SetValue(CONSTITUTIVE_LAW, std::make_shared<InterfaceCoulombWithTensionCutOff>(
+//                                                 std::make_unique<InterfacePlaneStrain>()));
+//
+//    // A normal closure of 0.01 gives a normal traction of -10, so the shear strength equals
+//    // c cos(phi) - sigma sin(phi) = 5 sqrt(3) + 5. A shear displacement of 0.05 exceeds it.
+//    auto element = CreateAndInitializeElement(
+//        CreateHorizontalUnitLength2Plus2NodedLineInterfaceElementWithUPwDofs, p_properties, IsDiffOrderElement::No,
+//        {CalculationContribution::Stiffness},
+//        PrescribedBoundedArrays{{2, array_1d<double, 3>{0.05, -0.01, 0.0}}, {3, array_1d<double, 3>{0.05, -0.01, 0.0}}});
+//    const auto shear_strength = 5.0 * std::sqrt(3.0) + 5.0;
+//    auto       tractions      = std::vector<Vector>{};
+//    element.CalculateOnIntegrationPoints(GEO_EFFECTIVE_TRACTION_VECTOR, tractions, ProcessInfo{});
+//    KRATOS_EXPECT_NEAR(std::abs(tractions[0][1]), shear_strength, 1.0e-6);
+//
+//    // Act: commit the sliding state and unload the shear displacement by 0.005
+//    element.FinalizeSolutionStep(ProcessInfo{});
+//    for (const auto index : {std::size_t{2}, std::size_t{3}}) {
+//        element.GetGeometry()[index].FastGetSolutionStepValue(DISPLACEMENT_X) = 0.045;
+//    }
+//    element.CalculateOnIntegrationPoints(GEO_EFFECTIVE_TRACTION_VECTOR, tractions, ProcessInfo{});
+//
+//    // Assert: the interface unloads elastically from the committed (sliding) state
+//    for (const auto& r_traction : tractions) {
+//        KRATOS_EXPECT_NEAR(r_traction[0], -10.0, 1.0e-6);
+//        KRATOS_EXPECT_NEAR(std::abs(r_traction[1]), shear_strength - stiffness * 0.005, 1.0e-6);
+//    }
+//}
 
 KRATOS_TEST_CASE_IN_SUITE(UPwLineInterfaceElement_3Plus3NodedElement_ReturnsExpectedLeftAndRightHandSide,
                           KratosGeoMechanicsFastSuiteWithoutKernel)
