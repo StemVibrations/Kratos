@@ -54,17 +54,20 @@ void FindNeighboursOfInterfacesProcess::RemoveNeighboursWithoutHigherLocalDimens
 {
     for (const auto& r_interface_model_part : mrInterfaceModelParts) {
         for (auto& r_interface_element : r_interface_model_part.get().Elements()) {
-            auto&      r_neighbour_elements = r_interface_element.GetValue(NEIGHBOUR_ELEMENTS);
+            // Filter the container of (global) pointers rather than the elements themselves. The
+            // iterators of a GlobalPointersVector dereference to the elements, so std::remove_if
+            // would assign the neighbouring elements to each other (including their Ids), which
+            // corrupts the model part.
+            auto& r_neighbour_pointers = r_interface_element.GetValue(NEIGHBOUR_ELEMENTS).GetContainer();
             const auto interface_element_local_dimension =
                 r_interface_element.GetGeometry().LocalSpaceDimension();
             auto is_neighbour_without_higher_local_dimension =
-                [interface_element_local_dimension](const Element& rNeighbourElement) {
-                return rNeighbourElement.GetGeometry().LocalSpaceDimension() <= interface_element_local_dimension;
+                [interface_element_local_dimension](const GlobalPointer<Element>& rpNeighbourElement) {
+                return rpNeighbourElement->GetGeometry().LocalSpaceDimension() <= interface_element_local_dimension;
             };
-            r_neighbour_elements.erase(
-                std::remove_if(r_neighbour_elements.begin(), r_neighbour_elements.end(),
-                               is_neighbour_without_higher_local_dimension),
-                r_neighbour_elements.end());
+            r_neighbour_pointers.erase(std::remove_if(r_neighbour_pointers.begin(), r_neighbour_pointers.end(),
+                                                      is_neighbour_without_higher_local_dimension),
+                                       r_neighbour_pointers.end());
         }
     }
 }
