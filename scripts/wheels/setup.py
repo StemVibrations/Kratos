@@ -85,7 +85,7 @@ setuptools.setup(
     package_data={
         'KratosMultiphysics': list(map(lambda x: ".libs/" + x, os.listdir("KratosMultiphysics/.libs")))
     },
-    python_requires='>=3.10',
+    python_requires='>=3.10, <3.15',
     ext_modules=EmptyListWithLength(),
     distclass=BinaryDistribution
 )

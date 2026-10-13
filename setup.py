@@ -32,6 +32,11 @@ def set_install_requirements():
         python_version_part = '-cp311-cp311'
     elif (platform.python_version().startswith("3.12.")):
         python_version_part = '-cp312-cp312'
+    elif (platform.python_version().startswith("3.13.")):
+        python_version_part = '-cp313-cp313'
+    elif (platform.python_version().startswith("3.14.")):
+        python_version_part = '-cp314-cp314'
+
 
     requirements = [
         f"orjson>=3.11.0",

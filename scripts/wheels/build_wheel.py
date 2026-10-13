@@ -22,8 +22,8 @@ PLATFORM_CONFIG = {
         'WHEEL_OUT': "/data_swap_guest"
     },
     'Windows': {
-        'PYTHONS': ["38", "39", "310", "311", "312", "313", "314"],
-        'PYTHON_BUILD_VER': "39",
+        'PYTHONS': ["310", "311", "312", "313", "314"],
+        'PYTHON_BUILD_VER': "310",
         'BUILD_SCRIPT': "scripts/wheels/windows/configure.bat",
         'BUILD_CORES': 24,
         'BASE_LD_LIBRARY_PATH': "",
