@@ -47,6 +47,7 @@ public:
 
     static void SetUFirstAndSecondDerivativeVector(const SystemVectorType& rFirstDerivativeVector,
                                                    const SystemVectorType& rSecondDerivativeVector,
+                                                   const DofsArrayType&    rDofSet,
                                                    ModelPart&              rModelPart);
 
     /// <summary>
@@ -69,28 +70,37 @@ public:
                                                   const SystemMatrixType& rSecondaryMatrix,
                                                   const DofsArrayType&    rDofSet);
 
+    /// Returns true when the dof is part of the (consecutively numbered) dof set, i.e. when it is
+    /// part of the system of equations. Dofs that have only been added to a node (e.g. the
+    /// translations of an embedded beam node or the rotations of a soil node) are not.
+    static bool IsPartOfDofSet(const Dof<double>& rDof, const DofsArrayType& rDofSet);
+
 private:
     static void GetDerivativesForOptionalVariable(const Variable<double>& rVariable,
                                                   const Node&             rNode,
                                                   SystemVectorType&       rFirstDerivativeVector,
                                                   SystemVectorType&       rSecondDerivativeVector,
+                                                  const DofsArrayType&    rDofSet,
                                                   const IndexType         BufferIndex);
 
     static void SetDerivativesForOptionalVariable(const Variable<double>& rVariable,
                                                   Node&                   rNode,
                                                   const SystemVectorType& rFirstDerivativeVector,
-                                                  const SystemVectorType& rSecondDerivativeVector);
+                                                  const SystemVectorType& rSecondDerivativeVector,
+                                                  const DofsArrayType&    rDofSet);
 
     static void GetDerivativesForVariable(const Variable<double>& rVariable,
                                           const Node&             rNode,
                                           SystemVectorType&       rFirstDerivativeVector,
                                           SystemVectorType&       rSecondDerivativeVector,
+                                          const DofsArrayType&    rDofSet,
                                           const IndexType         BufferIndex);
 
     static void SetDerivativesForVariable(const Variable<double>& rVariable,
                                           Node&                   rNode,
                                           const SystemVectorType& rFirstDerivativeVector,
-                                          const SystemVectorType& rSecondDerivativeVector);
+                                          const SystemVectorType& rSecondDerivativeVector,
+                                          const DofsArrayType&    rDofSet);
 
     /// <summary>
     /// Checks if current row has a non-zero entry on the diagonal,

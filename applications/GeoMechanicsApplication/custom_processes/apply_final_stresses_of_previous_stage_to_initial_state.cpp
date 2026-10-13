@@ -20,6 +20,7 @@
 #include "includes/ublas_interface.h"
 #include "includes/variables.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace Kratos
@@ -50,6 +51,14 @@ void ApplyFinalStressesOfPreviousStageToInitialState::ExecuteInitialize()
 
             CheckRetrievedElementData(constitutive_laws, stresses_on_integration_points, r_element.GetId());
             mStressesByElementId[r_element.GetId()] = stresses_on_integration_points;
+
+            if (constitutive_laws.front()->Has(GEO_INTERFACE_GAP)) {
+                auto& r_gaps = mInterfaceGapsByElementId[r_element.GetId()];
+                for (const auto& rp_law : constitutive_laws) {
+                    auto gap = 0.0;
+                    r_gaps.push_back(rp_law->GetValue(GEO_INTERFACE_GAP, gap));
+                }
+            }
         }
     }
 }
@@ -73,9 +82,18 @@ void ApplyFinalStressesOfPreviousStageToInitialState::ExecuteBeforeSolutionLoop(
                 constitutive_laws[i]->SetInitialState(p_initial_state);
                 constitutive_laws[i]->InitializeMaterial(rElement.GetProperties(), rElement.GetGeometry(), {});
             }
+
+            if (const auto it = mInterfaceGapsByElementId.find(rElement.GetId());
+                it != mInterfaceGapsByElementId.end()) {
+                for (auto i = std::size_t{0}; i < std::min(constitutive_laws.size(), it->second.size()); ++i) {
+                    constitutive_laws[i]->SetValue(GEO_INTERFACE_GAP, it->second[i],
+                                                   r_model_part.get().GetProcessInfo());
+                }
+            }
         };
     }
     mStressesByElementId.clear();
+    mInterfaceGapsByElementId.clear();
 }
 
 void ApplyFinalStressesOfPreviousStageToInitialState::CheckRetrievedElementData(

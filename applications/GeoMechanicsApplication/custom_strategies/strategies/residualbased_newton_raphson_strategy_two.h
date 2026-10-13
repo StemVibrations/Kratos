@@ -204,7 +204,9 @@ namespace Kratos
 
                 this->SetReferenceForcesOfGlobalForceErrorCriteria(rb);
                 is_converged = mpConvergenceCriteria->PostCriteria(r_model_part, r_dof_set, rA, rDx, rb);
-                if (is_converged) {
+                
+                // at least 2 iterations
+                if (is_converged && iteration_number > 1) {
                     break;
                 }
             }

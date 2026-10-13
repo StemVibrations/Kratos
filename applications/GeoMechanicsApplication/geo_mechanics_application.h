@@ -90,6 +90,8 @@
 #include "custom_elements/U_Pw_updated_lagrangian_FIC_element.h"
 #include "custom_elements/U_Pw_updated_lagrangian_element.h"
 #include "custom_elements/contribution_calculators/calculation_contribution.h"
+#include "custom_elements/geo_embedded_beam_element.h"
+#include "custom_elements/geo_embedded_beam_interface_element.h"
 #include "custom_elements/geo_steady_state_Pw_piping_element.h"
 #include "custom_elements/small_strain_U_Pw_diff_order_element.h"
 #include "custom_elements/steady_state_Pw_element.h"
@@ -504,6 +506,16 @@ private:
         0, Kratos::make_shared<Triangle2D15<NodeType>>(Element::GeometryType::PointsArrayType(15)),
         std::make_unique<AxisymmetricStressState>(),
         std::make_unique<IntegrationCoefficientModifierForAxisymmetricElement>()};
+
+    // embedded beam elements (Sadek & Shahrour, 2004)
+    const GeoEmbeddedBeamElement<2> mGeoEmbeddedBeamElement2D2N{
+        0, Kratos::make_shared<Line2D2<NodeType>>(Element::GeometryType::PointsArrayType(2))};
+    const GeoEmbeddedBeamElement<3> mGeoEmbeddedBeamElement3D2N{
+        0, Kratos::make_shared<Line3D2<NodeType>>(Element::GeometryType::PointsArrayType(2))};
+    const GeoEmbeddedBeamInterfaceElement<2> mGeoEmbeddedBeamInterfaceElement2D2N{
+        0, Kratos::make_shared<Line2D2<NodeType>>(Element::GeometryType::PointsArrayType(2))};
+    const GeoEmbeddedBeamInterfaceElement<3> mGeoEmbeddedBeamInterfaceElement3D2N{
+        0, Kratos::make_shared<Line3D2<NodeType>>(Element::GeometryType::PointsArrayType(2))};
 
     // interface elements
     const UPwSmallStrainInterfaceElement<2, 4> mUPwSmallStrainInterfaceElement2D4N{

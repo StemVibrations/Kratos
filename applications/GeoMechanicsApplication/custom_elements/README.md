@@ -185,6 +185,89 @@ $$ H = \int (\nabla N)^T k \nabla N dV $$
 
 
 
+# Embedded Beam Elements
+
+The embedded beam elements follow Sadek & Shahrour (2004). They let you model reinforcements such as (micro)piles, anchors and sheet piles with beams whose nodes do not need to coincide with the nodes of the soil mesh. The beam itself is a linear Timoshenko beam (`LinearTimoshenkoBeamElement2D2N`/`LinearTimoshenkoBeamElement3D2N` of the StructuralMechanicsApplication).
+
+## Perfectly bonded embedded beam
+
+Elements: `GeoEmbeddedBeamElement2D2N` and `GeoEmbeddedBeamElement3D2N`.
+
+The translations of a beam node $i$ are interpolated from the displacements $\boldsymbol{U}^s$ of the nodes of the soil (host) element in which it is located, while the rotations $\boldsymbol{\Theta}_i$ remain degrees of freedom of the beam node (Eq. 5-7 of the paper):
+
+```math
+\boldsymbol{U}^b = \begin{bmatrix} \boldsymbol{U}^b_i \\ \boldsymbol{\Theta}_i \\ \boldsymbol{U}^b_j \\ \boldsymbol{\Theta}_j \end{bmatrix} = \boldsymbol{N}^{bs} \begin{bmatrix} \boldsymbol{U}^s \\ \boldsymbol{\Theta}_i \\ \boldsymbol{\Theta}_j \end{bmatrix} \quad \quad \quad \quad \boldsymbol{N}^{bs} = \begin{bmatrix} \boldsymbol{N}^s(\boldsymbol{X}_i) & 0 & 0 \\ 0 & \boldsymbol{I} & 0 \\ \boldsymbol{N}^s(\boldsymbol{X}_j) & 0 & 0 \\ 0 & 0 & \boldsymbol{I} \end{bmatrix}
+```
+
+The stiffness matrix of the beam in global axes, $\boldsymbol{R}^b_g$, is then expressed in terms of these degrees of freedom (Eq. 11):
+
+```math
+\boldsymbol{R}^{bs}_g = {\boldsymbol{N}^{bs}}^T \boldsymbol{R}^b_g \boldsymbol{N}^{bs}
+```
+
+The same transformation is applied to the internal and external force vectors, the (lumped) mass matrix and the Rayleigh damping matrix. The degrees of freedom of the element are ordered as $\boldsymbol{U}^s$ (the translations of all host nodes, grouped per node), followed by the rotations of the two beam nodes. If a beam node is not located inside any host element, it keeps its own translational degrees of freedom.
+
+Notes:
+- The rotation degrees of freedom must be enabled (`"rotation_dofs": true` in the solver settings).
+- The translations of an embedded beam node are not degrees of freedom of the system. Point loads and boundary conditions on translations must therefore be applied to the soil. Alternatively, let the beam node coincide with a soil node by using the soil node itself, for example to apply a load at the pile head or to connect the pile to other structural elements. Boundary conditions on the rotations of the beam nodes can be applied as usual.
+- The displacements, velocities and accelerations of the embedded beam nodes are interpolated from the soil for postprocessing purposes.
+- The soil volume occupied by the beam is not removed, so the stiffness and mass of the beam are added to those of the soil.
+- Beam forces and moments are available through `CalculateOnIntegrationPoints`, as for the Timoshenko beam elements (e.g. `AXIAL_FORCE`, `BENDING_MOMENT`, `SHEAR_FORCE` in 2D and `AXIAL_FORCE`, `BENDING_MOMENT_X/Y/Z`, `SHEAR_FORCE_Y/Z` in 3D).
+- In 3D, the local axes follow from the beam axis and `LOCAL_AXIS_2` (when it is given on the geometry), else the global y axis, else the global z axis (for beams parallel to the y axis).
+
+## Embedded beam interface (slip)
+
+Elements: `GeoEmbeddedBeamInterfaceElement2D2N` and `GeoEmbeddedBeamInterfaceElement3D2N`.
+
+To allow for slip between the beam and the soil (section 2.3 of the paper), the beam is modelled by beam elements with their own degrees of freedom (e.g. `LinearTimoshenkoBeamElement2D2N`), and an interface element is defined on the same nodes. The relative displacement between a beam node and the soil at its location (Eq. 12, 19) is expressed in the local axes of the beam and linked to the bonding force per unit length of beam (Eq. 13-14):
+
+```math
+\boldsymbol{F}^{int} = \boldsymbol{C}^{int} \Delta \boldsymbol{u}^{int} \quad \quad \quad \quad \boldsymbol{C}^{int} = \begin{bmatrix} K_t & 0 & 0 \\ 0 & K_n & 0 \\ 0 & 0 & K_n \end{bmatrix}
+```
+
+The relative displacements are evaluated at the beam nodes, each representing half of the length of the beam element. The tangential bonding force follows a Mohr-Coulomb criterion:
+
+```math
+|t_t| \leq P \left( c + \max(0, -\sigma'_n) \tan \varphi \right)
+```
+
+where $P$ is the perimeter of the beam ($\pi D$ in 3D, two faces per unit width in 2D). $\sigma'_n$ is the effective normal stress of the host element on the shaft (tension positive), averaged over its integration points and updated at the start of every solution step.
+
+| Property | Description |
+|---|---|
+| `INTERFACE_SHEAR_STIFFNESS` | $K_t$, stiffness per unit length of beam $\mathrm{\left[ F L^{-2} \right]}$ |
+| `INTERFACE_NORMAL_STIFFNESS` | $K_n$, stiffness per unit length of beam $\mathrm{\left[ F L^{-2} \right]}$ |
+| `GEO_COHESION` | $c$, cohesion of the interface (optional) $\mathrm{\left[ F L^{-2} \right]}$ |
+| `GEO_FRICTION_ANGLE` | $\varphi$, friction angle of the interface in degrees (optional) |
+| `DIAMETER` | $D$, diameter of the beam, required in 3D when the shear strength is limited $\mathrm{\left[ L \right]}$ |
+
+When neither `GEO_COHESION` nor `GEO_FRICTION_ANGLE` is given, the interface is linear elastic. The local relative displacements and bonding forces at the beam nodes are available as `GEO_RELATIVE_DISPLACEMENT_VECTOR` and `GEO_EFFECTIVE_TRACTION_VECTOR`.
+
+In a staged analysis, `DISPLACEMENT` is the displacement of the current stage. The converged bonding forces at the end of a stage are therefore kept by the element as the initial bonding forces of the next stage, and the plastic slip is measured from the start of the stage. No `ApplyFinalStressesOfPreviousStageToInitialState` process is required (nor supported) for these elements; it is still required for the beam elements themselves. An element that is inactive during a stage loses its bonding forces, such that it starts unloaded when it is activated again.
+
+## Assigning the host elements
+
+The host elements need to be found before the elements are initialized. This is done by the `FindEmbeddedBeamHostElementsProcess`, which stores them in the `NEIGHBOUR_ELEMENTS` of the embedded elements:
+
+```json
+{
+    "python_module": "find_embedded_beam_host_elements_process",
+    "kratos_module": "KratosMultiphysics.GeoMechanicsApplication",
+    "process_name":  "FindEmbeddedBeamHostElementsProcess",
+    "Parameters":    {
+        "model_part_name_list":      ["PorousDomain.pile"],
+        "host_model_part_name_list": ["PorousDomain.soil"],
+        "search_tolerance":          1.0e-6
+    }
+}
+```
+
+Only elements of the host model parts whose local dimension equals the dimension of the model (i.e. continuum elements) are considered as host. Nodes of embedded elements that are not located inside any host element are reported.
+
+## Bibliography
+
+Sadek, M., & Shahrour, I. (2004). A three dimensional embedded beam element for reinforced geomaterials. *International Journal for Numerical and Analytical Methods in Geomechanics*, 28(9), 931–946. https://doi.org/10.1002/nag.357
+
 # Transient Thermal Element
 
 ## Introduction

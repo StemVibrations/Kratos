@@ -137,7 +137,36 @@ ConstitutiveLaw::Pointer InterfaceCoulombWithTensionCutOff::Clone() const
     p_result->mIsModelInitialized                  = mIsModelInitialized;
     p_result->mTrialTractionVector                 = mTrialTractionVector;
     p_result->mIsPlastic                           = mIsPlastic;
+    p_result->mGap                                 = mGap;
+    p_result->mGapFinalized                        = mGapFinalized;
     return p_result;
+}
+
+bool InterfaceCoulombWithTensionCutOff::Has(const Variable<double>& rVariable)
+{
+    return rVariable == GEO_INTERFACE_GAP || ConstitutiveLaw::Has(rVariable);
+}
+
+double& InterfaceCoulombWithTensionCutOff::GetValue(const Variable<double>& rVariable, double& rValue)
+{
+    if (rVariable == GEO_INTERFACE_GAP) {
+        rValue = mGap;
+    } else {
+        rValue = ConstitutiveLaw::GetValue(rVariable, rValue);
+    }
+    return rValue;
+}
+
+void InterfaceCoulombWithTensionCutOff::SetValue(const Variable<double>& rVariable,
+                                                 const double&           rValue,
+                                                 const ProcessInfo&      rCurrentProcessInfo)
+{
+    if (rVariable == GEO_INTERFACE_GAP) {
+        mGap          = rValue;
+        mGapFinalized = rValue;
+    } else {
+        ConstitutiveLaw::SetValue(rVariable, rValue, rCurrentProcessInfo);
+    }
 }
 
 Vector& InterfaceCoulombWithTensionCutOff::GetValue(const Variable<Vector>& rVariable, Vector& rValue)
@@ -248,23 +277,38 @@ void InterfaceCoulombWithTensionCutOff::CalculateMaterialResponseCauchy(Paramete
     const auto& r_properties   = rConstitutiveLawParameters.GetMaterialProperties();
     const auto  elastic_matrix = mpConstitutiveDimension->CalculateElasticMatrix(r_properties);
 
-    const Vector& r_relative_displacement_vector = rConstitutiveLawParameters.GetStrainVector();
+    const Vector& r_total_relative_displacement_vector = rConstitutiveLawParameters.GetStrainVector();
+
+    // The elastic predictor of the step, as used by the local error criteria
+    mTrialTractionVector = CalculateTrialTractionVector(r_total_relative_displacement_vector,
+                                                        r_properties[INTERFACE_NORMAL_STIFFNESS],
+                                                        r_properties[INTERFACE_SHEAR_STIFFNESS])
+                               .CopyTo<Vector>();
+
+    // Gap closure: a closing normal movement first closes the gap that has opened before. While
+    // the gap is closing, the normal traction does not change. Only the remainder of the closing
+    // movement builds up compression. (Without CONSIDER_GAP_CLOSURE, the gap is always zero.)
+    const auto gap_closure = std::clamp(
+        mRelativeDisplacementVectorFinalized[0] - r_total_relative_displacement_vector[0], 0.0, mGapFinalized);
+    Vector relative_displacement_vector = r_total_relative_displacement_vector;
+    relative_displacement_vector[0] += gap_closure;
 
     // Full elastic predictor over the entire relative-displacement increment.
     const auto full_trial_sigma_tau = CalculateTrialTractionVector(
-        r_relative_displacement_vector, r_properties[INTERFACE_NORMAL_STIFFNESS],
+        relative_displacement_vector, r_properties[INTERFACE_NORMAL_STIFFNESS],
         r_properties[INTERFACE_SHEAR_STIFFNESS]);
 
     // Admissibility (and the yield functions) are evaluated on the shear magnitude.
     auto full_trial_for_check  = full_trial_sigma_tau;
     full_trial_for_check.Tau() = std::abs(full_trial_for_check.Tau());
 
-    mTrialTractionVector = full_trial_sigma_tau.CopyTo<Vector>();
-    mIsPlastic           = !mCoulombWithTensionCutOffImpl.IsAdmissibleStressState(full_trial_for_check);
+    const auto is_admissible = mCoulombWithTensionCutOffImpl.IsAdmissibleStressState(full_trial_for_check);
+    mIsPlastic               = !is_admissible || gap_closure > 0.0;
 
     // If the whole step stays elastic, there is nothing to integrate and no need to sub-step.
-    if (!mIsPlastic) {
-        mTractionVector                              = full_trial_sigma_tau.CopyTo<Vector>();
+    if (is_admissible) {
+        mTractionVector = full_trial_sigma_tau.CopyTo<Vector>();
+        mGap = CalculateGapAfterTractionUpdate(r_properties, relative_displacement_vector, gap_closure);
         rConstitutiveLawParameters.GetStressVector() = mTractionVector;
         return;
     }
@@ -280,7 +324,7 @@ void InterfaceCoulombWithTensionCutOff::CalculateMaterialResponseCauchy(Paramete
         mCoulombWithTensionCutOffImpl, finalized_traction, elastic_traction_increment);
 
     const Vector total_relative_displacement_increment =
-        r_relative_displacement_vector - mRelativeDisplacementVectorFinalized;
+        relative_displacement_vector - mRelativeDisplacementVectorFinalized;
 
     // Advance elastically up to the intersection point; this becomes the starting (committed)
     // state for the sub-stepped plastic integration.
@@ -330,7 +374,28 @@ void InterfaceCoulombWithTensionCutOff::CalculateMaterialResponseCauchy(Paramete
         committed_relative_displacement = sub_relative_displacement;
     }
 
+    mGap = CalculateGapAfterTractionUpdate(r_properties, relative_displacement_vector, gap_closure);
     rConstitutiveLawParameters.GetStressVector() = mTractionVector;
+}
+
+double InterfaceCoulombWithTensionCutOff::CalculateGapAfterTractionUpdate(const Properties& rProperties,
+                                                                          const Vector& rEffectiveRelativeDisplacementVector,
+                                                                          double GapClosure) const
+{
+    const auto result = mGapFinalized - GapClosure;
+    if (!rProperties.Has(CONSIDER_GAP_CLOSURE) || !rProperties[CONSIDER_GAP_CLOSURE]) return result;
+
+    // A gap only opens when the normal traction has reached the tensile strength. Then, the plastic
+    // part of the normal opening of this step widens the gap.
+    const auto tensile_strength = rProperties[GEO_TENSILE_STRENGTH];
+    const auto tolerance =
+        1.0e-8 * std::max({1.0, std::abs(tensile_strength), std::abs(mTractionVectorFinalized[0])});
+    if (mTractionVector[0] < tensile_strength - tolerance) return result;
+
+    const auto plastic_normal_opening =
+        (rEffectiveRelativeDisplacementVector[0] - mRelativeDisplacementVectorFinalized[0]) -
+        (mTractionVector[0] - mTractionVectorFinalized[0]) / rProperties[INTERFACE_NORMAL_STIFFNESS];
+    return result + std::max(0.0, plastic_normal_opening);
 }
 
 Geo::SigmaTau InterfaceCoulombWithTensionCutOff::CalculateTrialTractionVector(const Vector& rRelativeDisplacementVector,
@@ -348,6 +413,7 @@ void InterfaceCoulombWithTensionCutOff::FinalizeMaterialResponseCauchy(Parameter
 {
     mRelativeDisplacementVectorFinalized = rConstitutiveLawParameters.GetStrainVector();
     mTractionVectorFinalized             = mTractionVector;
+    mGapFinalized                        = mGap;
 }
 
 std::optional<Geo::StressPointType> InterfaceCoulombWithTensionCutOff::GetStressPointType() const
@@ -396,6 +462,8 @@ void InterfaceCoulombWithTensionCutOff::save(Serializer& rSerializer) const
     rSerializer.save("RelativeDisplacementVectorFinalized", mRelativeDisplacementVectorFinalized);
     rSerializer.save("CoulombWithTensionCutOffImpl", mCoulombWithTensionCutOffImpl);
     rSerializer.save("IsModelInitialized", mIsModelInitialized);
+    rSerializer.save("Gap", mGap);
+    rSerializer.save("GapFinalized", mGapFinalized);
 }
 
 void InterfaceCoulombWithTensionCutOff::load(Serializer& rSerializer)
@@ -407,6 +475,8 @@ void InterfaceCoulombWithTensionCutOff::load(Serializer& rSerializer)
     rSerializer.load("RelativeDisplacementVectorFinalized", mRelativeDisplacementVectorFinalized);
     rSerializer.load("CoulombWithTensionCutOffImpl", mCoulombWithTensionCutOffImpl);
     rSerializer.load("IsModelInitialized", mIsModelInitialized);
+    rSerializer.load("Gap", mGap);
+    rSerializer.load("GapFinalized", mGapFinalized);
 }
 
 } // Namespace Kratos

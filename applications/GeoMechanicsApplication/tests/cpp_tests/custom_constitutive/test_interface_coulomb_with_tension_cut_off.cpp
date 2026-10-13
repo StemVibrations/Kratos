@@ -499,3 +499,123 @@ KRATOS_TEST_CASE_IN_SUITE(InterfaceCoulombWithTensionCutOff_CalculateConstitutiv
 }
 
 } // namespace Kratos::Testing
+
+namespace
+{
+
+using namespace Kratos;
+
+Properties CreatePropertiesForGapClosureTests(bool ConsiderGapClosure)
+{
+    auto properties = Properties{};
+    properties.SetValue(GEO_FRICTION_ANGLE, 30.0);
+    properties.SetValue(GEO_COHESION, 10.0);
+    properties.SetValue(GEO_DILATANCY_ANGLE, 0.0);
+    properties.SetValue(GEO_TENSILE_STRENGTH, 0.0);
+    properties.SetValue(INTERFACE_NORMAL_STIFFNESS, 100.0);
+    properties.SetValue(INTERFACE_SHEAR_STIFFNESS, 50.0);
+    properties.SetValue(CONSIDER_GAP_CLOSURE, ConsiderGapClosure);
+    return properties;
+}
+
+// Starts from a compressive normal traction of -10, opens the interface by a normal relative
+// displacement of 0.3 (of which 0.1 is elastic, such that a gap of 0.2 opens), and then closes it
+// again in steps to the given normal relative displacements. Returns the normal tractions and the
+// gaps after each closing step.
+std::pair<std::vector<double>, std::vector<double>> OpenAndCloseInterface(const Properties& rProperties,
+                                                                          const std::vector<double>& rClosingSteps)
+{
+    auto parameters = ConstitutiveLaw::Parameters{};
+    parameters.SetMaterialProperties(rProperties);
+    parameters.Set(ConstitutiveLaw::COMPUTE_STRESS);
+    auto traction_vector = Vector{ZeroVector{2}};
+    parameters.SetStressVector(traction_vector);
+    auto relative_displacement_vector = Vector{ZeroVector{2}};
+    parameters.SetStrainVector(relative_displacement_vector);
+
+    auto p_initial_state = make_intrusive<InitialState>();
+    p_initial_state->SetInitialStressVector(UblasUtilities::CreateVector({-10.0, 0.0}));
+    p_initial_state->SetInitialStrainVector(Vector{ZeroVector{2}});
+
+    auto law = InterfaceCoulombWithTensionCutOff{std::make_unique<InterfacePlaneStrain>()};
+    law.SetInitialState(p_initial_state);
+    InitializeLawMaterial(law, rProperties);
+
+    relative_displacement_vector[0] = 0.3;
+    law.CalculateMaterialResponseCauchy(parameters);
+    law.FinalizeMaterialResponseCauchy(parameters);
+
+    auto result = std::pair<std::vector<double>, std::vector<double>>{};
+    for (const auto normal_relative_displacement : rClosingSteps) {
+        relative_displacement_vector[0] = normal_relative_displacement;
+        law.CalculateMaterialResponseCauchy(parameters);
+        law.FinalizeMaterialResponseCauchy(parameters);
+        auto gap = 0.0;
+        result.first.push_back(parameters.GetStressVector()[0]);
+        result.second.push_back(law.GetValue(GEO_INTERFACE_GAP, gap));
+    }
+    return result;
+}
+
+} // namespace
+
+namespace Kratos::Testing
+{
+
+KRATOS_TEST_CASE_IN_SUITE(InterfaceCoulombWithTensionCutOff_GapMustCloseBeforeCompressionDevelops,
+                          KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Act: close the gap of 0.2 in two steps of 0.1 and compress beyond it by 0.1
+    const auto [normal_tractions, gaps] =
+        OpenAndCloseInterface(CreatePropertiesForGapClosureTests(true), {0.2, 0.1, 0.0});
+
+    // Assert
+    KRATOS_EXPECT_VECTOR_NEAR(normal_tractions, (std::vector<double>{0.0, 0.0, -10.0}), 1.0e-8);
+    KRATOS_EXPECT_VECTOR_NEAR(gaps, (std::vector<double>{0.1, 0.0, 0.0}), 1.0e-8);
+}
+
+KRATOS_TEST_CASE_IN_SUITE(InterfaceCoulombWithTensionCutOff_CompressionDevelopsImmediatelyWithoutGapClosure,
+                          KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Act
+    const auto [normal_tractions, gaps] =
+        OpenAndCloseInterface(CreatePropertiesForGapClosureTests(false), {0.2, 0.1, 0.0});
+
+    // Assert
+    KRATOS_EXPECT_VECTOR_NEAR(normal_tractions, (std::vector<double>{-10.0, -20.0, -30.0}), 1.0e-8);
+    KRATOS_EXPECT_VECTOR_NEAR(gaps, (std::vector<double>{0.0, 0.0, 0.0}), 1.0e-8);
+}
+
+KRATOS_TEST_CASE_IN_SUITE(InterfaceCoulombWithTensionCutOff_GapCanBeSetAndIsKeptWhenReinitialized,
+                          KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Arrange
+    const auto properties = CreatePropertiesForGapClosureTests(true);
+    auto       law        = InterfaceCoulombWithTensionCutOff{std::make_unique<InterfacePlaneStrain>()};
+    InitializeLawMaterial(law, properties);
+    KRATOS_EXPECT_TRUE(law.Has(GEO_INTERFACE_GAP))
+
+    // Act
+    law.SetValue(GEO_INTERFACE_GAP, 0.2, ProcessInfo{});
+    InitializeLawMaterial(law, properties);
+    const auto p_cloned_law = law.Clone();
+
+    // Assert
+    auto gap = 0.0;
+    KRATOS_EXPECT_DOUBLE_EQ(law.GetValue(GEO_INTERFACE_GAP, gap), 0.2);
+    KRATOS_EXPECT_DOUBLE_EQ(p_cloned_law->GetValue(GEO_INTERFACE_GAP, gap), 0.2);
+
+    // A closing normal movement of 0.1 does not build up a normal traction
+    auto parameters = ConstitutiveLaw::Parameters{};
+    parameters.SetMaterialProperties(properties);
+    parameters.Set(ConstitutiveLaw::COMPUTE_STRESS);
+    auto traction_vector = Vector{ZeroVector{2}};
+    parameters.SetStressVector(traction_vector);
+    auto relative_displacement_vector = UblasUtilities::CreateVector({-0.1, 0.0});
+    parameters.SetStrainVector(relative_displacement_vector);
+    law.CalculateMaterialResponseCauchy(parameters);
+    KRATOS_EXPECT_VECTOR_NEAR(parameters.GetStressVector(), (Vector{ZeroVector{2}}), 1.0e-8);
+    KRATOS_EXPECT_DOUBLE_EQ(law.GetValue(GEO_INTERFACE_GAP, gap), 0.1);
+}
+
+} // namespace Kratos::Testing

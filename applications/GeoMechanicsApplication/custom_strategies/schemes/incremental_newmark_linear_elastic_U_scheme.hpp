@@ -126,7 +126,7 @@ public:
         TSparseSpace::UnaliasedAdd(second_derivative_vector, 1.0, delta_second_derivative_vector);
 
         Geo::SparseSystemUtilities::SetUFirstAndSecondDerivativeVector(
-            first_derivative_vector, second_derivative_vector, rModelPart);
+            first_derivative_vector, second_derivative_vector, rDofSet, rModelPart);
 
         KRATOS_CATCH("")
     }

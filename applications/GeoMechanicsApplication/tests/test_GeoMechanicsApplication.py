@@ -74,6 +74,7 @@ from interface_prestress import KratosGeoMechanicsInterfacePreStressTests
 from test_building_pit import KratosGeoMechanicsBuildingPit
 from test_local_error_criteria import KratosGeoMechanicsLocalErrorCriteriaTests
 from test_global_force_error_criterion import KratosGeoMechanicsGlobalForceErrorCriterionTests
+from test_embedded_beam import KratosGeoMechanicsEmbeddedBeamTests
 
 def AssembleTestSuites():
     ''' Populates the test suites to run.
@@ -133,6 +134,7 @@ def AssembleTestSuites():
                         KratosGeoMechanicsInterfacePreStressTests,
                         KratosGeoMechanicsLocalErrorCriteriaTests,
                         KratosGeoMechanicsGlobalForceErrorCriterionTests,
+                        KratosGeoMechanicsEmbeddedBeamTests,
                         ]
 
     night_test_cases = [

@@ -143,6 +143,12 @@ void KratosGeoMechanicsApplication::Register()
     KRATOS_REGISTER_ELEMENT("Geo_UPwLineInterfacePlaneStrainDiffOrderElement3Plus3N",
                             mUPwLineInterfacePlaneStrainDiffOrderElement3Plus3N)
 
+    // Embedded beam elements
+    KRATOS_REGISTER_ELEMENT("GeoEmbeddedBeamElement2D2N", mGeoEmbeddedBeamElement2D2N)
+    KRATOS_REGISTER_ELEMENT("GeoEmbeddedBeamElement3D2N", mGeoEmbeddedBeamElement3D2N)
+    KRATOS_REGISTER_ELEMENT("GeoEmbeddedBeamInterfaceElement2D2N", mGeoEmbeddedBeamInterfaceElement2D2N)
+    KRATOS_REGISTER_ELEMENT("GeoEmbeddedBeamInterfaceElement3D2N", mGeoEmbeddedBeamInterfaceElement3D2N)
+
     // Updated-Lagrangian elements
     KRATOS_REGISTER_ELEMENT("UPwUpdatedLagrangianElement2D3N", mUPwUpdatedLagrangianElement2D3N)
     KRATOS_REGISTER_ELEMENT("UPwUpdatedLagrangianElement2D4N", mUPwUpdatedLagrangianElement2D4N)
@@ -601,6 +607,7 @@ void KratosGeoMechanicsApplication::Register()
 
     KRATOS_REGISTER_VARIABLE(GEO_SHEAR_CAPACITY)
     KRATOS_REGISTER_VARIABLE(GEO_PLASTICITY_STATUS)
+    KRATOS_REGISTER_VARIABLE(GEO_INTERFACE_GAP)
 
     KRATOS_REGISTER_VARIABLE(INACCURATE_PLASTIC_POINTS)
     KRATOS_REGISTER_VARIABLE(N_PLASTIC_POINTS)
