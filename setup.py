@@ -9,8 +9,8 @@ def set_install_requirements():
     Creates kratos requirements list
     """
 
-    release_tag = "sheetpile_0.2"
-    kratos_version = "10.4.14.15"
+    release_tag = "sheetpile_0.3"
+    kratos_version = "10.4.14.16"
 
     python_version_part = ""
     platform_part = ""
