@@ -178,7 +178,12 @@ build_interface () {
 
 PYTHON_LOCATION=$(which python$PYTHON_VERSION)
 
-$PYTHON_LOCATION -m pip install setuptools wheel auditwheel
+$PYTHON_LOCATION -m pip install setuptools wheel auditwheel "patchelf>=0.14.5"
+# Make sure the pip-installed patchelf (in the python bin dir) takes precedence over the system one
+export PATH="$(dirname "$PYTHON_LOCATION"):$PATH"
+hash -r
+echo "Using patchelf: $(which patchelf) ($(patchelf --version))"
+
 
 echo "Starting core build"
 build_core $PYTHON_LOCATION ${KRATOS_ROOT}/bin/core
