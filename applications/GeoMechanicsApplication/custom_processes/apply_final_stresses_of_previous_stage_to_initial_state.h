@@ -44,6 +44,8 @@ private:
                                           IndexType                  ElementId);
 
     std::map<IndexType, std::vector<Vector>> mStressesByElementId;
+    // Gaps of interfaces that consider gap closure, which are carried over to the next stage
+    std::map<IndexType, std::vector<double>> mInterfaceGapsByElementId;
 };
 
 } // namespace Kratos

@@ -742,6 +742,82 @@ void UPwSmallStrainElement<TDim, TNumNodes>::CalculateMassMatrix(MatrixType& rMa
 }
 
 template <unsigned int TDim, unsigned int TNumNodes>
+void UPwSmallStrainElement<TDim, TNumNodes>::Calculate(const Variable<Vector>& rVariable,
+                                                       Vector&                 rOutput,
+                                                       const ProcessInfo&      rCurrentProcessInfo)
+{
+    KRATOS_TRY
+
+    if (rVariable == EXTERNAL_FORCES_VECTOR) {
+        rOutput = CalculateExternalForces(rCurrentProcessInfo);
+    } else if (rVariable == INTERNAL_FORCES_VECTOR) {
+        Vector right_hand_side;
+        this->CalculateRightHandSide(right_hand_side, rCurrentProcessInfo);
+        rOutput = CalculateExternalForces(rCurrentProcessInfo) - right_hand_side;
+    } else {
+        UPwBaseElement::Calculate(rVariable, rOutput, rCurrentProcessInfo);
+    }
+
+    KRATOS_CATCH("")
+}
+
+template <unsigned int TDim, unsigned int TNumNodes>
+Vector UPwSmallStrainElement<TDim, TNumNodes>::CalculateExternalForces(const ProcessInfo& rCurrentProcessInfo)
+{
+    KRATOS_TRY
+
+    const GeometryType&                             r_geometry = this->GetGeometry();
+    const GeometryType::IntegrationPointsArrayType& r_integration_points =
+        r_geometry.IntegrationPoints(this->GetIntegrationMethod());
+
+    ElementVariables variables;
+    this->InitializeElementVariables(variables, rCurrentProcessInfo);
+
+    const auto integration_coefficients =
+        this->CalculateIntegrationCoefficients(r_integration_points, variables.detJContainer);
+    const auto det_Js_initial_configuration = GeoEquationOfMotionUtilities::CalculateDetJsInitialConfiguration(
+        r_geometry, this->GetIntegrationMethod());
+    const auto integration_coefficients_on_initial_configuration =
+        this->CalculateIntegrationCoefficients(r_integration_points, det_Js_initial_configuration);
+
+    // The same retention law and permeability data as used for the right-hand side
+    const auto b_matrices     = CalculateBMatrices(variables.DN_DXContainer, variables.NContainer);
+    const auto strain_vectors = StressStrainUtilities::CalculateStrains(
+        CalculateDeformationGradients(), b_matrices, variables.DisplacementVector,
+        variables.UseHenckyStrain, this->GetStressStatePolicy().GetVoigtSize());
+    const auto fluid_pressures = GeoTransportEquationUtilities::CalculateFluidPressures(
+        variables.NContainer, variables.PressureVector);
+    const auto degrees_of_saturation        = CalculateDegreesOfSaturation(fluid_pressures);
+    auto       relative_permeability_values = this->CalculateRelativePermeabilityValues(fluid_pressures);
+    const auto permeability_update_factors  = GetOptionalPermeabilityUpdateFactors(strain_vectors);
+    std::ranges::transform(permeability_update_factors, relative_permeability_values,
+                           relative_permeability_values.begin(), std::multiplies<>{});
+    const auto bishop_coefficients = this->CalculateBishopCoefficients(fluid_pressures);
+
+    auto result = Vector{ZeroVector(this->GetNumberOfDOF())};
+    for (unsigned int integration_point = 0; integration_point < r_integration_points.size(); ++integration_point) {
+        this->CalculateKinematics(variables, integration_point);
+        GeoElementUtilities::CalculateNuMatrix<TDim, TNumNodes>(variables.Nu, variables.NContainer, integration_point);
+        GeoElementUtilities::InterpolateVariableWithComponents<TDim, TNumNodes>(
+            variables.BodyAcceleration, variables.NContainer, variables.VolumeAcceleration, integration_point);
+
+        variables.DegreeOfSaturation     = degrees_of_saturation[integration_point];
+        variables.RelativePermeability   = relative_permeability_values[integration_point];
+        variables.BishopCoefficient      = bishop_coefficients[integration_point];
+        variables.IntegrationCoefficient = integration_coefficients[integration_point];
+        variables.IntegrationCoefficientInitialConfiguration =
+            integration_coefficients_on_initial_configuration[integration_point];
+
+        this->CalculateAndAddMixBodyForce(result, variables);
+        if (!variables.IgnoreUndrained) this->CalculateAndAddFluidBodyFlow(result, variables);
+    }
+
+    return result;
+
+    KRATOS_CATCH("")
+}
+
+template <unsigned int TDim, unsigned int TNumNodes>
 void UPwSmallStrainElement<TDim, TNumNodes>::CalculateAll(MatrixType&        rLeftHandSideMatrix,
                                                           VectorType&        rRightHandSideVector,
                                                           const ProcessInfo& rCurrentProcessInfo,

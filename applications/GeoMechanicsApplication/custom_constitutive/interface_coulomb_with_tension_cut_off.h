@@ -15,6 +15,7 @@
 #pragma once
 
 #include "custom_constitutive/coulomb_with_tension_cut_off_impl.h"
+#include "custom_constitutive/local_error_data_provider.h"
 #include "includes/constitutive_law.h"
 
 namespace Kratos
@@ -22,7 +23,8 @@ namespace Kratos
 
 class ConstitutiveLawDimension;
 
-class KRATOS_API(GEO_MECHANICS_APPLICATION) InterfaceCoulombWithTensionCutOff : public ConstitutiveLaw
+class KRATOS_API(GEO_MECHANICS_APPLICATION) InterfaceCoulombWithTensionCutOff : public ConstitutiveLaw,
+                                                                                public LocalErrorDataProvider
 {
 public:
     KRATOS_CLASS_POINTER_DEFINITION(InterfaceCoulombWithTensionCutOff);
@@ -49,10 +51,14 @@ public:
                                                               const Geometry<Node>& rElementGeometry,
                                                               const Vector&         rShapeFunctionsValues) override;
     void    InitializeMaterialResponseCauchy(Parameters& rConstitutiveLawParameters) override;
+    bool    Has(const Variable<double>& rVariable) override;
+    using ConstitutiveLaw::Has;
     Vector& GetValue(const Variable<Vector>& rVariable, Vector& rValue) override;
     int&    GetValue(const Variable<int>& rVariable, int& rValue) override;
+    double& GetValue(const Variable<double>& rVariable, double& rValue) override;
     using ConstitutiveLaw::GetValue;
     void SetValue(const Variable<Vector>& rVariable, const Vector& rValue, const ProcessInfo& rCurrentProcessInfo) override;
+    void SetValue(const Variable<double>& rVariable, const double& rValue, const ProcessInfo& rCurrentProcessInfo) override;
     using ConstitutiveLaw::SetValue;
     [[nodiscard]] int Check(const Properties&   rMaterialProperties,
                             const GeometryType& rElementGeometry,
@@ -64,6 +70,9 @@ public:
                            Matrix&                 rValue) override;
     using ConstitutiveLaw::CalculateValue;
 
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+    [[nodiscard]] Geo::LocalErrorData CalculateLocalErrorData(Parameters& rConstitutiveLawParameters) override;
+
 private:
     std::unique_ptr<ConstitutiveLawDimension> mpConstitutiveDimension;
     Vector                                    mTractionVector;
@@ -72,9 +81,23 @@ private:
     CoulombWithTensionCutOffImpl              mCoulombWithTensionCutOffImpl;
     bool                                      mIsModelInitialized = false;
 
+    // Transient data of the most recent traction calculation, used by the local error criteria:
+    // the elastic predictor of the whole step and whether plastic flow occurred in the step
+    Vector mTrialTractionVector;
+    bool   mIsPlastic = false;
+
+    // Width of the gap (normal opening beyond the tension cut-off) that must be closed before the
+    // interface can transfer compression again. Only used when CONSIDER_GAP_CLOSURE is set. The gap
+    // is not reset by InitializeMaterial, such that it is kept when the law is re-initialized.
+    double mGap          = 0.0;
+    double mGapFinalized = 0.0;
+
     [[nodiscard]] Geo::SigmaTau CalculateTrialTractionVector(const Vector& rRelativeDisplacementVector,
                                                              double NormalStiffness,
                                                              double ShearStiffness) const;
+    [[nodiscard]] double CalculateGapAfterTractionUpdate(const Properties& rProperties,
+                                                         const Vector& rEffectiveRelativeDisplacementVector,
+                                                         double        GapClosure) const;
 
     friend class Serializer;
     void save(Serializer& rSerializer) const override;

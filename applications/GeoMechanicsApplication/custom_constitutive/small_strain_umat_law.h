@@ -20,6 +20,7 @@
 
 // Project includes
 #include "constitutive_law_dimension.h"
+#include "custom_constitutive/local_error_data_provider.h"
 #include "includes/constitutive_law.h"
 #include "includes/serializer.h"
 
@@ -106,7 +107,8 @@ using pF_UMATMod = void (*)(double*       STRESS,
  */
 
 template <SizeType TVoigtSize>
-class KRATOS_API(GEO_MECHANICS_APPLICATION) SmallStrainUMATLaw : public ConstitutiveLaw
+class KRATOS_API(GEO_MECHANICS_APPLICATION) SmallStrainUMATLaw : public ConstitutiveLaw,
+                                                                 public LocalErrorDataProvider
 {
 public:
     // The process info type definition
@@ -295,6 +297,14 @@ public:
     using ConstitutiveLaw::Has;
     bool Has(const Variable<Vector>& rVariable) override;
 
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+
+    // Since a UMAT neither provides its elastic stiffness matrix nor a plasticity indicator, the
+    // elastic predictor is based on the stiffness matrix that the UMAT returns for a zero strain
+    // increment from the state at the start of the step. A stress point is regarded as plastic when
+    // its constitutive stress deviates from this elastic predictor.
+    [[nodiscard]] Geo::LocalErrorData CalculateLocalErrorData(ConstitutiveLaw::Parameters& rValues) override;
+
     ///@}
     ///@name Inquiry
     ///@{
@@ -400,6 +410,12 @@ private:
 
     // Set number of MaterialParameters
     void CallUMAT(ConstitutiveLaw::Parameters& rValues);
+    void InvokeUMAT(ConstitutiveLaw::Parameters& rValues);
+
+    // Returns the stiffness matrix that the UMAT returns for a zero strain increment from the state
+    // at the start of the step, in terms of the internal stress and strain components. The state of
+    // this law is not altered.
+    Matrix CalculateInternalStiffnessMatrixAtStartOfStep(ConstitutiveLaw::Parameters& rValues);
 
     // Set state variables to the initial values
     void ResetStateVariables(const Properties& rMaterialProperties);

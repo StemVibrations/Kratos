@@ -147,6 +147,11 @@ SizeType SmallStrainUDSM3DInterfaceLaw::WorkingSpaceDimension() { return N_DIM_3
 
 SizeType SmallStrainUDSM3DInterfaceLaw::GetStrainSize() const { return VOIGT_SIZE_3D_INTERFACE; }
 
+std::optional<Geo::StressPointType> SmallStrainUDSM3DInterfaceLaw::GetStressPointType() const
+{
+    return Geo::StressPointType::Interface;
+}
+
 std::string SmallStrainUDSM3DInterfaceLaw::Info() const { return "SmallStrainUDSM3DInterfaceLaw"s; }
 
 void SmallStrainUDSM3DInterfaceLaw::PrintData(std::ostream& rOStream) const

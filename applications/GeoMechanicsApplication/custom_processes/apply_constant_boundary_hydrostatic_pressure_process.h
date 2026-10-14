@@ -44,7 +44,7 @@ public:
 
     [[nodiscard]] unsigned int GetGravityDirection() const;
 
-    [[nodiscard]] double GetReferenceCoordinate() const;
+    [[nodiscard]] const Vector& GetReferenceCoordinate() const;
 
     [[nodiscard]] double GetSpecificWeight() const;
 
@@ -54,7 +54,7 @@ private:
     bool         mIsFixed;
     bool         mIsFixedProvided;
     unsigned int mGravityDirection;
-    double       mReferenceCoordinate;
+    Vector      mReferenceCoordinate;
     double       mSpecificWeight;
 };
 

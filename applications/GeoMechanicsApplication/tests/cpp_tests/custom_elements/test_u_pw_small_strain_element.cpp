@@ -713,4 +713,61 @@ KRATOS_TEST_CASE_IN_SUITE(UPwSmallStrainElement_InitializeCorrectlySetsStatePara
                                            Defaults::relative_tolerance);
     }
 }
+
+KRATOS_TEST_CASE_IN_SUITE(UPwSmallStrainElement_ExternalForcesAreTheBodyForces, KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Arrange
+    Model model;
+    auto  p_element =
+        CreateUPwSmallStrainElementWithUPwDofs(model, CreatePropertiesForUPwSmallStrainElementTest());
+    const auto zero_values = array_1d<double, 3>{0.0, 0.0, 0.0};
+    for (auto& r_node : p_element->GetGeometry()) {
+        r_node.FastGetSolutionStepValue(DISPLACEMENT)        = zero_values;
+        r_node.FastGetSolutionStepValue(VELOCITY)            = zero_values;
+        r_node.FastGetSolutionStepValue(VOLUME_ACCELERATION) = array_1d<double, 3>{0.0, -10.0, 0.0};
+        r_node.FastGetSolutionStepValue(WATER_PRESSURE)      = 0.0;
+        r_node.FastGetSolutionStepValue(DT_WATER_PRESSURE)   = 0.0;
+    }
+    const auto process_info = ProcessInfo{};
+    p_element->Initialize(process_info);
+
+    // Act
+    Vector external_forces;
+    p_element->Calculate(EXTERNAL_FORCES_VECTOR, external_forces, process_info);
+
+    // Assert: the weight of the mixture is 0.5 m2 * ((1 - 0.1) * 2650 + 0.1 * 1000) kg/m3 * 10 m/s2
+    KRATOS_EXPECT_EQ(external_forces.size(), std::size_t{9});
+    KRATOS_EXPECT_NEAR(external_forces[0] + external_forces[2] + external_forces[4], 0.0, Defaults::absolute_tolerance);
+    KRATOS_EXPECT_RELATIVE_NEAR(external_forces[1] + external_forces[3] + external_forces[5], -12425.0,
+                                Defaults::relative_tolerance);
+
+    // Without any stresses and water pressures, the right-hand side consists of the external forces only
+    Vector right_hand_side;
+    p_element->CalculateRightHandSide(right_hand_side, process_info);
+    KRATOS_EXPECT_VECTOR_NEAR(external_forces, right_hand_side, 1.0e-6);
+}
+
+KRATOS_TEST_CASE_IN_SUITE(UPwSmallStrainElement_RightHandSideIsExternalMinusInternalForces, KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Arrange
+    Model model;
+    auto  p_properties = CreatePropertiesForUPwSmallStrainElementTest();
+    p_properties->SetValue(BIOT_COEFFICIENT, 1.0); // to get right-hand side contributions of the coupling
+    auto p_element = CreateUPwSmallStrainElementWithUPwDofs(model, p_properties);
+    SetSolutionStepValuesForGeneralCheck(p_element);
+    const auto process_info = ProcessInfo{};
+    p_element->Initialize(process_info);
+
+    // Act
+    Vector right_hand_side;
+    p_element->CalculateRightHandSide(right_hand_side, process_info);
+    Vector internal_forces;
+    p_element->Calculate(INTERNAL_FORCES_VECTOR, internal_forces, process_info);
+    Vector external_forces;
+    p_element->Calculate(EXTERNAL_FORCES_VECTOR, external_forces, process_info);
+
+    // Assert
+    KRATOS_EXPECT_GT(norm_2(internal_forces), 1.0);
+    KRATOS_EXPECT_VECTOR_NEAR(right_hand_side, Vector{external_forces - internal_forces}, 1.0e-6);
+}
 } // namespace Kratos::Testing

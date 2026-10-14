@@ -367,6 +367,10 @@ public:
         const ProcessInfo& rCurrentProcessInfo
         ) override;
 
+
+    void Calculate(const Variable<Vector>& rVariable, Vector& rOutput, const ProcessInfo& rCurrentProcessInfo) override;
+    using Element::Calculate;
+
     /**
      * @brief This function provides the place to perform checks on the completeness of the input.
      * @details It is designed to be called only once (or anyway, not often) typically at the beginning
@@ -473,7 +477,11 @@ private:
     ///@}
     ///@name Private Operators
     ///@{
+    void CalculateInternalForces(VectorType& rRHS,
+        const ProcessInfo& rProcessInfo);
 
+    void CalculateExternalForces(VectorType& rRHS,
+        const ProcessInfo& rProcessInfo);
     ///@}
     ///@name Private Operations
     ///@{

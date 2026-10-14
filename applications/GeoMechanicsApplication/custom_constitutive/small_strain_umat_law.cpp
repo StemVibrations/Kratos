@@ -17,6 +17,9 @@
 #include "custom_constitutive/small_strain_umat_law.h"
 #include "custom_utilities/check_utilities.hpp"
 #include "custom_utilities/constitutive_law_utilities.h"
+#include "custom_utilities/local_error_utilities.h"
+
+#include <array>
 
 #ifdef KRATOS_COMPILED_IN_WINDOWS
 #include "windows.hpp"
@@ -554,7 +557,7 @@ void SmallStrainUMATLaw<TVoigtSize>::CalculateStress(ConstitutiveLaw::Parameters
 }
 
 template <SizeType TVoigtSize>
-void SmallStrainUMATLaw<TVoigtSize>::CallUMAT(ConstitutiveLaw::Parameters& rValues)
+void SmallStrainUMATLaw<TVoigtSize>::InvokeUMAT(ConstitutiveLaw::Parameters& rValues)
 {
     KRATOS_TRY
 
@@ -588,12 +591,43 @@ void SmallStrainUMATLaw<TVoigtSize>::CallUMAT(ConstitutiveLaw::Parameters& rValu
     // variable to check if an error happened in the model:
     const auto& MaterialParameters = rValues.GetMaterialProperties()[UMAT_PARAMETERS];
     auto        nProperties        = static_cast<int>(MaterialParameters.size());
+    std::mutex umat_mutex;
+    umat_mutex.lock();
     mpUserMod(&(mStressVector.data()[0]), &(mStateVariables.data()[0]), (double**)mMatrixD, &SSE,
               &SPD, &SCD, nullptr, nullptr, nullptr, nullptr, &(mStrainVectorFinalized.data()[0]),
               &(mDeltaStrainVector.data()[0]), &time, &deltaTime, nullptr, nullptr, nullptr,
               nullptr, &materialName, &ndi, &nshr, &ntens, &nStateVariables,
               &(MaterialParameters.data()[0]), &nProperties, nullptr, nullptr, nullptr, nullptr,
               nullptr, nullptr, &iElement, &integrationNumber, nullptr, nullptr, &iStep, &iteration);
+    umat_mutex.unlock();
+
+    KRATOS_CATCH("")
+}
+
+template <SizeType TVoigtSize>
+void SmallStrainUMATLaw<TVoigtSize>::CallUMAT(ConstitutiveLaw::Parameters& rValues)
+{
+    KRATOS_TRY
+
+    InvokeUMAT(rValues);
+
+    const auto nStateVariables = static_cast<int>(mStateVariablesFinalized.size());
+    auto& r_process_info =
+        const_cast<ProcessInfo&>(rValues.GetProcessInfo());
+    if (nStateVariables > 0) {
+		// get first value of state variables as a flag to check if the model has an error or not:
+        if (mStateVariables[0] < 0.0) {
+            #pragma omp atomic
+			r_process_info[INACCURATE_PLASTIC_POINTS] += 1;
+			//std::cout << "Warning: UMAT model returned an error flag. Number of inaccurate plastic points: " << rValues.GetProcessInfo()[INACCURATE_PLASTIC_POINTS] << std::endl;
+        }
+        if (mStateVariables[0] >= 1.0)
+        {
+            #pragma omp atomic
+            r_process_info[N_PLASTIC_POINTS] += 1;
+        }
+
+    }
 
     KRATOS_CATCH("")
 }
@@ -790,6 +824,94 @@ template <SizeType TVoigtSize>
 bool SmallStrainUMATLaw<TVoigtSize>::Has(const Variable<Vector>& rVariable)
 {
     return rVariable == STATE_VARIABLES || rVariable == CAUCHY_STRESS_VECTOR;
+}
+
+template <SizeType TVoigtSize>
+std::optional<Geo::StressPointType> SmallStrainUMATLaw<TVoigtSize>::GetStressPointType() const
+{
+    // The UMATs that are based on interface dimensions use the interface stress components directly
+    // (the interface UMATs that are based on three-dimensional components override this function)
+    if constexpr (TVoigtSize == VOIGT_SIZE_2D_INTERFACE || TVoigtSize == VOIGT_SIZE_3D_INTERFACE) {
+        return Geo::StressPointType::Interface;
+    } else {
+        return Geo::StressPointType::Soil;
+    }
+}
+
+template <SizeType TVoigtSize>
+Geo::LocalErrorData SmallStrainUMATLaw<TVoigtSize>::CalculateLocalErrorData(ConstitutiveLaw::Parameters& rValues)
+{
+    KRATOS_TRY
+
+    // All quantities are expressed in terms of the internal stress and strain components (which
+    // also hold the mapped components of the plane strain and interface models)
+    const auto stiffness_matrix = CalculateInternalStiffnessMatrixAtStartOfStep(rValues);
+
+    auto stress_vector_at_start_of_step = Vector(TVoigtSize);
+    auto strain_increment_vector        = Vector(TVoigtSize);
+    auto stress_vector                  = Vector(TVoigtSize);
+    std::copy_n(mStressVectorFinalized.begin(), TVoigtSize, stress_vector_at_start_of_step.begin());
+    std::copy_n(mDeltaStrainVector.begin(), TVoigtSize, strain_increment_vector.begin());
+    std::copy_n(mStressVector.begin(), TVoigtSize, stress_vector.begin());
+    const Vector elastic_stress_increment = prod(stiffness_matrix, strain_increment_vector);
+    const Vector elastic_predictor        = stress_vector_at_start_of_step + elastic_stress_increment;
+
+    auto result      = Geo::LocalErrorData{};
+    result.IsPlastic = LocalErrorUtilities::DeviatesFromElasticPredictor(elastic_predictor, stress_vector);
+    // Whether the elastic stiffness of a UMAT is stress dependent is unknown. Note that such stress
+    // points are regarded as plastic, since their stresses deviate from the elastic predictor.
+    result.HasStressDependentStiffness = false;
+    result.ElasticPredictorDeviation   = elastic_predictor - stress_vector;
+    result.TotalStrainEnergyIncrement =
+        inner_prod(strain_increment_vector, stress_vector - stress_vector_at_start_of_step);
+    result.ElasticStrainEnergyIncrement = inner_prod(strain_increment_vector, elastic_stress_increment);
+    // The shear components follow the normal components
+    if (GetStressPointType() == Geo::StressPointType::Interface) {
+        result.IndexOfFirstShearComponent = mpConstitutiveDimension->GetNumberOfNormalComponents();
+        result.MaximumShearStress         = LocalErrorUtilities::CalculateShearTractionMagnitude(
+            stress_vector, result.IndexOfFirstShearComponent);
+    } else {
+        result.MaximumShearStress = LocalErrorUtilities::CalculateMaximumShearStress(stress_vector);
+    }
+    result.Cohesion = LocalErrorUtilities::GetCohesionIfAvailable(rValues.GetMaterialProperties());
+    return result;
+
+    KRATOS_CATCH("")
+}
+
+template <SizeType TVoigtSize>
+Matrix SmallStrainUMATLaw<TVoigtSize>::CalculateInternalStiffnessMatrixAtStartOfStep(ConstitutiveLaw::Parameters& rValues)
+{
+    KRATOS_TRY
+
+    // Calling the UMAT must not alter the state of this law, so keep a copy of the data that is
+    // overwritten
+    const auto delta_strain_vector = mDeltaStrainVector;
+    const auto stress_vector       = mStressVector;
+    const auto state_variables     = mStateVariables;
+    auto       matrix_d            = std::array<double, TVoigtSize * TVoigtSize>{};
+    std::copy_n(&mMatrixD[0][0], matrix_d.size(), matrix_d.begin());
+
+    std::fill(mDeltaStrainVector.begin(), mDeltaStrainVector.end(), 0.0);
+    InvokeUMAT(rValues);
+
+    auto       result     = Matrix(TVoigtSize, TVoigtSize);
+    const bool is_fortran = rValues.GetMaterialProperties()[IS_FORTRAN_UDSM];
+    for (unsigned int i = 0; i < TVoigtSize; ++i) {
+        for (unsigned int j = 0; j < TVoigtSize; ++j) {
+            // A Fortran style matrix is stored column-wise
+            result(i, j) = is_fortran ? mMatrixD[j][i] : mMatrixD[i][j];
+        }
+    }
+
+    mDeltaStrainVector = delta_strain_vector;
+    mStressVector      = stress_vector;
+    mStateVariables    = state_variables;
+    std::copy(matrix_d.begin(), matrix_d.end(), &mMatrixD[0][0]);
+
+    return result;
+
+    KRATOS_CATCH("")
 }
 
 template <SizeType TVoigtSize>

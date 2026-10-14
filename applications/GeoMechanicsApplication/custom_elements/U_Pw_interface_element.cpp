@@ -496,6 +496,32 @@ void UPwInterfaceElement::Initialize(const ProcessInfo& rCurrentProcessInfo)
     }
 }
 
+// void UPwInterfaceElement::FinalizeSolutionStep(const ProcessInfo& rCurrentProcessInfo)
+// {
+//     Element::FinalizeSolutionStep(rCurrentProcessInfo);
+//     if (!IsActive()) return;
+
+//     // Commit the material state of the converged step, such that incremental (e.g. plastic) laws
+//     // start the next step from it. Otherwise, the laws would integrate every step from the state
+//     // at the start of the stage, which erases the history of the stage.
+//     const auto relative_displacements =
+//         CalculateRelativeDisplacementsAtIntegrationPoints(CalculateLocalBMatricesAtIntegrationPoints());
+//     for (auto i = std::size_t{0}; i < mConstitutiveLaws.size(); ++i) {
+//         auto& rp_law = mConstitutiveLaws[i];
+//         if (!rp_law->RequiresFinalizeMaterialResponse()) continue;
+
+//         auto relative_displacement = relative_displacements[i];
+//         auto traction              = Vector{rp_law->GetStrainSize()};
+//         auto law_parameters =
+//             ConstitutiveLaw::Parameters{GetDisplacementGeometry(), GetProperties(), rCurrentProcessInfo};
+//         law_parameters.SetStrainVector(relative_displacement);
+//         law_parameters.SetStressVector(traction);
+//         law_parameters.Set(ConstitutiveLaw::COMPUTE_STRESS);
+//         rp_law->CalculateMaterialResponseCauchy(law_parameters);
+//         rp_law->FinalizeMaterialResponseCauchy(law_parameters);
+//     }
+// }
+
 int UPwInterfaceElement::Check(const ProcessInfo& rCurrentProcessInfo) const
 {
     int error = Element::Check(rCurrentProcessInfo);

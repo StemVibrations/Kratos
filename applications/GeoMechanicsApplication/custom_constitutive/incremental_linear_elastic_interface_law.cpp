@@ -114,6 +114,18 @@ int GeoIncrementalLinearElasticInterfaceLaw::Check(const Properties& rMaterialPr
     return result;
 }
 
+std::optional<Geo::StressPointType> GeoIncrementalLinearElasticInterfaceLaw::GetStressPointType() const
+{
+    return Geo::StressPointType::Interface;
+}
+
+Geo::LocalErrorData GeoIncrementalLinearElasticInterfaceLaw::CalculateLocalErrorData(Parameters&)
+{
+    // A linear elastic interface point is never plastic, so it doesn't take part in the local error criteria
+    auto result                      = Geo::LocalErrorData{};
+    result.ElasticPredictorDeviation = ZeroVector(GetStrainSize());
+    return result;
+}
 void GeoIncrementalLinearElasticInterfaceLaw::ResetMaterial(const Properties&, const GeometryType&, const Vector&)
 {
     mPreviousRelativeDisplacement = ZeroVector(mPreviousRelativeDisplacement.size());

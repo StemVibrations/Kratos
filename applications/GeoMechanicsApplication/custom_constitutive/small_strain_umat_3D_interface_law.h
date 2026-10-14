@@ -95,6 +95,8 @@ public:
      */
     SizeType GetStrainSize() const override;
 
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+
     /**
      * @brief Returns the expected strain measure of this constitutive law (by default Green-Lagrange)
      * @return the expected strain measure

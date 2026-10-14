@@ -16,6 +16,7 @@
 #include <string>
 
 #include "custom_constitutive/constitutive_law_dimension.h"
+#include "custom_constitutive/local_error_data_provider.h"
 #include "geo_mechanics_application_variables.h"
 #include "includes/constitutive_law.h"
 #include "includes/define.h"
@@ -74,7 +75,8 @@ using pF_UserMod          = void (*)(int*,
                             int*,
                             int*);
 
-class KRATOS_API(GEO_MECHANICS_APPLICATION) SmallStrainUDSMLaw : public ConstitutiveLaw
+class KRATOS_API(GEO_MECHANICS_APPLICATION) SmallStrainUDSMLaw : public ConstitutiveLaw,
+                                                                 public LocalErrorDataProvider
 {
 public:
     using SizeType = std::size_t;
@@ -153,6 +155,9 @@ public:
     bool Has(const Variable<Vector>& rThisVariable) override;
     using ConstitutiveLaw::Has;
 
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+    [[nodiscard]] Geo::LocalErrorData CalculateLocalErrorData(Parameters& rParameters) override;
+
     [[nodiscard]] std::string Info() const override;
     void                      PrintInfo(std::ostream& rOStream) const override;
     void                      PrintData(std::ostream& rOStream) const override;
@@ -206,6 +211,14 @@ private:
     array_1d<double, Sig0Size> mSig0{Sig0Size, 0.0};
 
     std::unique_ptr<ConstitutiveLawDimension> mpDimension;
+
+    // The plasticity indicator (IPL) that was returned by the most recent stress calculation of the
+    // UDSM (0 means elastic). It is transient data that is used by the local error criteria.
+    int mPlasticityIndicator = 0;
+
+    // Returns the elastic stiffness matrix (IDTASK = 6) at the state at the start of the step. The
+    // matrix is expressed in terms of the internal (three-dimensional) stress and strain components.
+    Matrix CalculateInternalElasticMatrix(Parameters& rValues);
 
     // to load UDSM and functions
     bool loadUDSM(const Properties& rMaterialProperties);

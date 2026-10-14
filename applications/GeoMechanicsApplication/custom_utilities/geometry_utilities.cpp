@@ -23,7 +23,7 @@ std::size_t GetNumberOfCornerPoints(GeometryData::KratosGeometryFamily GeometryF
 {
     switch (GeometryFamily) {
         using enum GeometryData::KratosGeometryFamily;
-    case Kratos_Point:
+	case Kratos_Point:
 		return 1;
     case Kratos_Linear:
         return 2;

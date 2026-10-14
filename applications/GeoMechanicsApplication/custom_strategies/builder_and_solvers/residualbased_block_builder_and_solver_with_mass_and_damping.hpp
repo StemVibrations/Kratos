@@ -491,10 +491,13 @@ protected:
                                    TSystemVectorType&      rFirstDerivativeVector,
                                    TSystemVectorType&      rSecondDerivativeVector) const
     {
+        const auto& r_dof = rNode.GetDof(rVariable);
+        if (!Geo::SparseSystemUtilities::IsPartOfDofSet(r_dof, BaseType::mDofSet)) return;
+
         const auto& first_derivative  = rVariable.GetTimeDerivative();
         const auto& second_derivative = first_derivative.GetTimeDerivative();
 
-        const auto equation_id               = rNode.GetDof(rVariable).EquationId();
+        const auto equation_id               = r_dof.EquationId();
         rFirstDerivativeVector[equation_id]  = rNode.FastGetSolutionStepValue(first_derivative);
         rSecondDerivativeVector[equation_id] = rNode.FastGetSolutionStepValue(second_derivative);
     }

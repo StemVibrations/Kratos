@@ -94,6 +94,8 @@ public:
      */
     SizeType GetStrainSize() const override;
 
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+
     ///@}
     ///@name Access
     ///@{

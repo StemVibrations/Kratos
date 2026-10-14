@@ -40,6 +40,12 @@ public:
     [[nodiscard]] bool IsAdmissibleStressState(const Geo::SigmaTau& rTrialTraction);
     [[nodiscard]] bool IsAdmissibleStressState(const Geo::PrincipalStresses& rTrialPrincipalStresses);
 
+    // Combined yield function value (max of the Coulomb and tension cut-off yield functions).
+    // A value < 0 means the stress state is inside the admissible domain, > 0 means outside.
+    // This provides the sign-changing scalar used by the Pegasus intersection algorithm.
+    [[nodiscard]] double YieldFunctionValue(const Geo::PrincipalStresses& rPrincipalStresses) const;
+    [[nodiscard]] double YieldFunctionValue(const Geo::SigmaTau& rTraction) const;
+
     [[nodiscard]] Geo::SigmaTau DoReturnMapping(const Geo::SigmaTau& rTrialTraction,
                                                 const Matrix&        rElasticConstitutiveTensor,
                                                 Geo::PrincipalStresses::AveragingType AveragingType);

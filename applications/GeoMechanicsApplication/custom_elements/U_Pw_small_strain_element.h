@@ -112,6 +112,13 @@ public:
 
     using UPwBaseElement::CalculateOnIntegrationPoints;
 
+    // Supports EXTERNAL_FORCES_VECTOR, i.e. the body forces of the mixture (displacement degrees of
+    // freedom) and of the fluid (water pressure degrees of freedom), and INTERNAL_FORCES_VECTOR, such
+    // that the right-hand side equals the external minus the internal forces
+    void Calculate(const Variable<Vector>& rVariable, Vector& rOutput, const ProcessInfo& rCurrentProcessInfo) override;
+
+    using UPwBaseElement::Calculate;
+
     std::string Info() const override;
 
     void PrintInfo(std::ostream& rOStream) const override;
@@ -266,6 +273,8 @@ protected:
     VectorType GetPressureSolutionVector();
 
 private:
+    Vector CalculateExternalForces(const ProcessInfo& rCurrentProcessInfo);
+
     friend class Serializer;
 
     void save(Serializer& rSerializer) const override;

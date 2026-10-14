@@ -20,6 +20,8 @@
 #include "tests/cpp_tests/geo_mechanics_fast_suite.h"
 #include "tests/cpp_tests/test_utilities.h"
 
+#include <vector>
+
 using namespace Kratos;
 using namespace std::string_literals;
 
@@ -962,6 +964,110 @@ KRATOS_TEST_CASE_IN_SUITE(MohrCoulombWithTensionCutoff_InitialPlasticityStatusEq
 
     // Assert, plasticity status elastic after initialization
     KRATOS_EXPECT_EQ(plasticity_status, static_cast<int>(PlasticityStatus::ELASTIC));
+}
+
+// Integrates the Mohr-Coulomb-with-tension-cutoff law along a sequence of cumulative strain
+// states (starting from a zero-seeded, committed state), finalizing the material response
+// between consecutive states. Returns the final Cauchy stress vector.
+Vector IntegrateMohrCoulombStrainPath(const Properties& rProperties, const std::vector<Vector>& rCumulativeStrainStates)
+{
+    auto       law = MohrCoulombWithTensionCutOff(std::make_unique<PlaneStrain>());
+    const auto dummy_element_geometry      = Geometry<Node>{};
+    const auto dummy_shape_function_values = Vector{};
+    law.InitializeMaterial(rProperties, dummy_element_geometry, dummy_shape_function_values);
+
+    ConstitutiveLaw::Parameters parameters;
+    parameters.Set(ConstitutiveLaw::COMPUTE_STRESS);
+    parameters.SetMaterialProperties(rProperties);
+
+    // Seed the finalized (committed) state at zero stress / zero strain.
+    Vector zero_state = ZeroVector(4);
+    parameters.SetStrainVector(zero_state);
+    parameters.SetStressVector(zero_state);
+    law.InitializeMaterialResponseCauchy(parameters);
+
+    for (const auto& r_strain_state : rCumulativeStrainStates) {
+        Vector strain_state = r_strain_state; // non-const copy required by SetStrainVector
+        parameters.SetStrainVector(strain_state);
+        law.CalculateMaterialResponseCauchy(parameters);
+        law.FinalizeMaterialResponseCauchy(parameters);
+    }
+
+    Vector result;
+    law.GetValue(CAUCHY_STRESS_VECTOR, result);
+    return result;
+}
+
+// Builds a list of cumulative strain states that follow the given waypoints, using
+// NIncrementsPerLeg linear increments between each consecutive pair of waypoints.
+std::vector<Vector> BuildLinearlyInterpolatedStrainPath(const std::vector<Vector>& rWaypoints,
+                                                        std::size_t                NIncrementsPerLeg)
+{
+    std::vector<Vector> states;
+    for (std::size_t leg = 0; leg + 1 < rWaypoints.size(); ++leg) {
+        const auto& r_start = rWaypoints[leg];
+        const auto& r_end   = rWaypoints[leg + 1];
+        for (std::size_t i = 1; i <= NIncrementsPerLeg; ++i) {
+            const auto fraction = static_cast<double>(i) / static_cast<double>(NIncrementsPerLeg);
+            states.push_back(Vector{r_start + fraction * (r_end - r_start)});
+        }
+    }
+    return states;
+}
+
+// This test isolates, in a single stress point, the reason a boundary value problem converges
+// better when the strain increment is split into sub-steps EVEN WITHOUT hardening. Perfect
+// plasticity is only path-INdependent for a proportional (radial) strain path with fixed
+// principal directions. Here a NON-proportional L-shaped history (pure shear, then compression)
+// is applied. Its principal axes rotate between the legs, so the return mapping - which is
+// performed in the trial-stress principal frame and classifies the return zone from the trial
+// state - is genuinely path-dependent.
+KRATOS_TEST_CASE_IN_SUITE(MohrCoulombWithTensionCutOff_NonProportionalPathIsPathDependentWithoutHardening,
+                          KratosGeoMechanicsFastSuiteWithoutKernel)
+{
+    // Arrange: perfect plasticity (no hardening).
+    Properties properties;
+    properties.SetValue(GEO_COULOMB_HARDENING_TYPE, "None");
+    properties.SetValue(GEO_FRICTION_ANGLE, 30.0);
+    properties.SetValue(GEO_COHESION, 10.0);
+    properties.SetValue(GEO_DILATANCY_ANGLE, 0.0);
+    properties.SetValue(GEO_TENSILE_STRENGTH, 10.0);
+    properties.SetValue(YOUNG_MODULUS, 1.0e3);
+    properties.SetValue(POISSON_RATIO, 0.0);
+
+    // L-shaped strain history (engineering shear in the 4th component):
+    //   leg 1: pure shear      0 -> (xy = 0.06)
+    //   leg 2: add compression   (xy = 0.06) -> (yy = -0.06)
+    const auto zero_state  = Vector{ZeroVector(4)};
+    const auto shear_state = UblasUtilities::CreateVector({0.0, 0.0, 0.0, 0.06});
+    const auto end_state   = UblasUtilities::CreateVector({0.0, -0.06, 0.0, 0.06});
+
+    constexpr std::size_t increments_per_leg = 400;
+
+    // Act
+    // 1. True non-proportional L-path, finely integrated (the correct history-dependent answer).
+    const auto reference_path_stress = IntegrateMohrCoulombStrainPath(
+        properties, BuildLinearlyInterpolatedStrainPath({zero_state, shear_state, end_state}, increments_per_leg));
+    // 2. The whole end strain applied in a single call (internal adaptive sub-stepping, straight line).
+    const auto lumped_oneshot_stress =
+        IntegrateMohrCoulombStrainPath(properties, std::vector<Vector>{end_state});
+    // 3. Straight line 0 -> end, finely integrated externally (isolates integration accuracy).
+    const auto straight_fine_stress = IntegrateMohrCoulombStrainPath(
+        properties, BuildLinearlyInterpolatedStrainPath({zero_state, end_state}, increments_per_leg));
+
+    // Assert
+    // (a) The internal (straight-line) sub-stepping is an accurate integrator: a single lumped
+    //     call reproduces the finely integrated straight path.
+    KRATOS_EXPECT_VECTOR_NEAR(lumped_oneshot_stress, straight_fine_stress, 1.0e-1);
+
+    // (b) The loading PATH matters even with NO hardening: the non-proportional (rotating-axes)
+    //     history produces a genuinely different stress than the straight path. The difference is
+    //     orders of magnitude above numerical noise, demonstrating the path dependence that makes
+    //     a boundary value problem converge better when the increment is sub-stepped.
+    const auto path_dependence   = norm_2(Vector{reference_path_stress - straight_fine_stress});
+    const auto integration_error = norm_2(Vector{lumped_oneshot_stress - straight_fine_stress});
+    KRATOS_EXPECT_GT(path_dependence, 1.0e-2);
+    KRATOS_EXPECT_GT(path_dependence, integration_error);
 }
 
 } // namespace Kratos::Testing

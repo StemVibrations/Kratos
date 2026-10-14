@@ -11,11 +11,13 @@
 //
 
 #include <algorithm>
+#include <array>
 #include <type_traits>
 
 #include "custom_constitutive/small_strain_udsm_law.h"
 #include "custom_utilities/check_utilities.hpp"
 #include "custom_utilities/constitutive_law_utilities.h"
+#include "custom_utilities/local_error_utilities.h"
 
 #ifdef KRATOS_COMPILED_IN_WINDOWS
 #include "windows.hpp"
@@ -673,6 +675,7 @@ void SmallStrainUDSMLaw::CloneDataMembersTo(SmallStrainUDSMLaw& rDestination) co
     rDestination.mStateVariablesFinalized = mStateVariablesFinalized;
     rDestination.mSig0                    = mSig0;
     rDestination.mpDimension              = mpDimension ? mpDimension->Clone() : nullptr;
+    rDestination.mPlasticityIndicator     = mPlasticityIndicator;
 }
 
 void SmallStrainUDSMLaw::CalculateConstitutiveMatrix(Parameters& rValues, Matrix& rConstitutiveMatrix)
@@ -758,6 +761,9 @@ void SmallStrainUDSMLaw::CallUDSM(UDSMTaskId TaskId, Parameters& rValues)
         KRATOS_ERROR << "the specified UDSM returns an error while call UDSM with IDTASK: " << task_id_as_int
                      << ". UDSM: " << rMaterialProperties[UDSM_NAME] << std::endl;
     }
+
+    if (TaskId == UDSMTaskId::STRESS_CALCULATION) mPlasticityIndicator = iPlastic;
+
     KRATOS_CATCH("")
 }
 
@@ -923,6 +929,78 @@ void SmallStrainUDSMLaw::SetValue(const Variable<Vector>& rVariable, const Vecto
 bool SmallStrainUDSMLaw::Has(const Variable<Vector>& rThisVariable)
 {
     return rThisVariable == STATE_VARIABLES || rThisVariable == CAUCHY_STRESS_VECTOR;
+}
+
+std::optional<Geo::StressPointType> SmallStrainUDSMLaw::GetStressPointType() const
+{
+    return Geo::StressPointType::Soil;
+}
+
+Geo::LocalErrorData SmallStrainUDSMLaw::CalculateLocalErrorData(Parameters& rParameters)
+{
+    KRATOS_TRY
+
+    // All quantities are expressed in terms of the internal (three-dimensional) components, which
+    // also hold the (mapped) components of plane strain and interface models
+    const auto elastic_matrix = CalculateInternalElasticMatrix(rParameters);
+
+    auto stress_vector_at_start_of_step = Vector(VOIGT_SIZE_3D);
+    auto strain_increment_vector        = Vector(VOIGT_SIZE_3D);
+    auto stress_vector                  = Vector(VOIGT_SIZE_3D);
+    std::copy_n(mSig0.begin(), VOIGT_SIZE_3D, stress_vector_at_start_of_step.begin());
+    std::copy_n(mDeltaStrainVector.begin(), VOIGT_SIZE_3D, strain_increment_vector.begin());
+    std::copy_n(mStressVector.begin(), VOIGT_SIZE_3D, stress_vector.begin());
+
+    const Vector elastic_stress_increment = prod(elastic_matrix, strain_increment_vector);
+
+    auto result                        = Geo::LocalErrorData{};
+    result.IsPlastic                   = mPlasticityIndicator != 0;
+    result.HasStressDependentStiffness = mAttributes[index_of_is_stress_dependent_flag] == 1;
+    result.ElasticPredictorDeviation = stress_vector_at_start_of_step + elastic_stress_increment - stress_vector;
+    result.TotalStrainEnergyIncrement =
+        inner_prod(strain_increment_vector, stress_vector - stress_vector_at_start_of_step);
+    result.ElasticStrainEnergyIncrement = inner_prod(strain_increment_vector, elastic_stress_increment);
+    if (GetStressPointType() == Geo::StressPointType::Interface) {
+        result.IndexOfFirstShearComponent = INDEX_3D_XY;
+        result.MaximumShearStress = LocalErrorUtilities::CalculateShearTractionMagnitude(stress_vector, INDEX_3D_XY);
+    } else {
+        result.MaximumShearStress = LocalErrorUtilities::CalculateMaximumShearStress(stress_vector);
+    }
+    result.Cohesion = LocalErrorUtilities::GetCohesionIfAvailable(rParameters.GetMaterialProperties());
+    return result;
+
+    KRATOS_CATCH("")
+}
+
+Matrix SmallStrainUDSMLaw::CalculateInternalElasticMatrix(Parameters& rValues)
+{
+    KRATOS_TRY
+
+    // Calling the UDSM must not alter the state of this law, so keep a copy of the data that the
+    // UDSM may overwrite
+    const auto stress_vector   = mStressVector;
+    const auto state_variables = mStateVariables;
+    auto       matrix_d        = std::array<double, VOIGT_SIZE_3D * VOIGT_SIZE_3D>{};
+    std::copy_n(&mMatrixD[0][0], matrix_d.size(), matrix_d.begin());
+
+    CallUDSM(UDSMTaskId::MATRIX_ELASTIC, rValues);
+
+    auto       result     = Matrix(VOIGT_SIZE_3D, VOIGT_SIZE_3D);
+    const bool is_fortran = rValues.GetMaterialProperties()[IS_FORTRAN_UDSM];
+    for (unsigned int i = 0; i < VOIGT_SIZE_3D; ++i) {
+        for (unsigned int j = 0; j < VOIGT_SIZE_3D; ++j) {
+            // A Fortran style matrix is stored column-wise
+            result(i, j) = is_fortran ? mMatrixD[j][i] : mMatrixD[i][j];
+        }
+    }
+
+    mStressVector   = stress_vector;
+    mStateVariables = state_variables;
+    std::copy(matrix_d.begin(), matrix_d.end(), &mMatrixD[0][0]);
+
+    return result;
+
+    KRATOS_CATCH("")
 }
 
 std::string SmallStrainUDSMLaw::Info() const { return "SmallStrainUDSMLaw"s; }

@@ -48,6 +48,8 @@
 #include "custom_processes/calculate_incremental_motion_process.h"
 #include "custom_processes/calculate_total_motion_process.h"
 #include "custom_processes/deactivate_conditions_on_inactive_elements_process.h"
+#include "custom_processes/deactivate_unsupported_interfaces_process.h"
+#include "custom_processes/find_embedded_beam_host_elements_process.h"
 #include "custom_processes/find_neighbour_elements_of_conditions_process.h"
 #include "custom_processes/find_neighbours_of_interfaces_process.h"
 #include "custom_processes/geo_extrapolate_integration_point_values_to_nodes_process.hpp"
@@ -146,6 +148,11 @@ void AddCustomProcessesToPython(pybind11::module& m)
         m, "DeactivateConditionsOnInactiveElements")
         .def(py::init<ModelPart&>());
 
+    py::class_<DeactivateUnsupportedInterfacesProcess, DeactivateUnsupportedInterfacesProcess::Pointer, Process>(
+        m, "DeactivateUnsupportedInterfacesProcess")
+        .def(py::init<ModelPart&>())
+        .def("GetNumberOfDeactivatedInterfaces", &DeactivateUnsupportedInterfacesProcess::GetNumberOfDeactivatedInterfaces);
+
     py::class_<SetAbsorbingBoundaryParametersProcess, SetAbsorbingBoundaryParametersProcess::Pointer, Process>(
         m, "SetAbsorbingBoundaryParametersProcess")
         .def(py::init<ModelPart&, Parameters&>());
@@ -196,6 +203,10 @@ void AddCustomProcessesToPython(pybind11::module& m)
 
     py::class_<FindNeighboursOfInterfacesProcess, FindNeighboursOfInterfacesProcess::Pointer, Process>(
         m, "FindNeighboursOfInterfacesProcess")
+        .def(py::init<Model&, const Parameters&>());
+
+    py::class_<FindEmbeddedBeamHostElementsProcess, FindEmbeddedBeamHostElementsProcess::Pointer, Process>(
+        m, "FindEmbeddedBeamHostElementsProcess")
         .def(py::init<Model&, const Parameters&>());
 }
 

@@ -37,6 +37,8 @@ public:
 
     [[nodiscard]] SizeType GetStrainSize() const override;
 
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+
     [[nodiscard]] std::string Info() const override;
     void                      PrintData(std::ostream& rOStream) const override;
 

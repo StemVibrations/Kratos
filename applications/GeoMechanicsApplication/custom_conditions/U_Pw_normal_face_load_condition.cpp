@@ -115,6 +115,12 @@ void UPwNormalFaceLoadCondition<TDim, TNumNodes>::CalculateTractionVector(array_
 
     Vector normal_vector = ZeroVector(3);
     if constexpr (TDim == 2) {
+
+        double normal_sign = 1.0;
+        if (this->Has(CONTACT_PRESSURE)) {
+            normal_sign = this->GetValue(CONTACT_PRESSURE);
+        }
+
         const auto tangential_stress =
             std::inner_product(shape_function_values.begin(), shape_function_values.end(),
                                Variables.TangentialStressVector.begin(), 0.0);
@@ -124,7 +130,7 @@ void UPwNormalFaceLoadCondition<TDim, TNumNodes>::CalculateTractionVector(array_
         Vector out_of_plane_vector = ZeroVector(3);
         out_of_plane_vector[2]     = 1.0;
         MathUtils<>::CrossProduct(normal_vector, out_of_plane_vector, tangential_vector);
-        auto traction_vector = tangential_stress * tangential_vector + normal_stress * normal_vector;
+        auto traction_vector = tangential_stress * tangential_vector + normal_stress * normal_vector * normal_sign;
         std::copy_n(traction_vector.begin(), TDim, rTractionVector.begin());
     } else if constexpr (TDim == 3) {
         MathUtils<>::CrossProduct(normal_vector, column(Jacobian, 0), column(Jacobian, 1));

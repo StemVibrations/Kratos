@@ -174,6 +174,20 @@ bool GeoLinearElasticLaw::GetConsiderDiagonalEntriesOnlyAndNoShear() const
     return mConsiderDiagonalEntriesOnlyAndNoShear;
 }
 
+std::optional<Geo::StressPointType> GeoLinearElasticLaw::GetStressPointType() const
+{
+    return Geo::StressPointType::Soil;
+}
+
+Geo::LocalErrorData GeoLinearElasticLaw::CalculateLocalErrorData(ConstitutiveLaw::Parameters&)
+{
+    // A linear elastic stress point never deviates from its elastic predictor, so its local error
+    // is always zero (and its maximum shear stress and cohesion are irrelevant)
+    auto result                      = Geo::LocalErrorData{};
+    result.ElasticPredictorDeviation = ZeroVector(GetStrainSize());
+    return result;
+}
+
 void GeoLinearElasticLaw::save(Serializer& rSerializer) const
 {
     KRATOS_SERIALIZE_SAVE_BASE_CLASS(rSerializer, ConstitutiveLaw)

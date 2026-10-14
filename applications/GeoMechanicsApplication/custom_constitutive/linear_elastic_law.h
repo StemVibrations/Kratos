@@ -12,12 +12,14 @@
 
 #pragma once
 
+#include "custom_constitutive/local_error_data_provider.h"
 #include "includes/constitutive_law.h"
 
 namespace Kratos
 {
 
-class KRATOS_API(GEO_MECHANICS_APPLICATION) GeoLinearElasticLaw : public ConstitutiveLaw
+class KRATOS_API(GEO_MECHANICS_APPLICATION) GeoLinearElasticLaw : public ConstitutiveLaw,
+                                                                  public LocalErrorDataProvider
 {
 public:
     bool RequiresInitializeMaterialResponse() override;
@@ -52,6 +54,9 @@ public:
 
     void               SetConsiderDiagonalEntriesOnlyAndNoShear(bool Whether);
     [[nodiscard]] bool GetConsiderDiagonalEntriesOnlyAndNoShear() const;
+
+    [[nodiscard]] std::optional<Geo::StressPointType> GetStressPointType() const override;
+    [[nodiscard]] Geo::LocalErrorData CalculateLocalErrorData(ConstitutiveLaw::Parameters& rParameters) override;
 
 protected:
     virtual void CalculateElasticMatrix(Matrix& rConstitutiveMatrix, ConstitutiveLaw::Parameters& rValues) = 0;

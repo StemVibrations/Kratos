@@ -226,7 +226,7 @@ class GeoMechanicsAnalysis(AnalysisStage):
         return "GeoMechanics Analysis"
 
     def _GetMinDeltaTimeValueOrDefault(self):
-        delta_time_as_fraction_of_time_span = 0.0001
+        delta_time_as_fraction_of_time_span = 0.000001
         return self.min_delta_time if self.min_delta_time is not None else min(self.initial_delta_time, delta_time_as_fraction_of_time_span * (self.end_time - self.start_time))
 
 if __name__ == '__main__':

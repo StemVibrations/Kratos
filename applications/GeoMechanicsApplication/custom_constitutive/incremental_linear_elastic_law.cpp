@@ -183,6 +183,18 @@ void GeoIncrementalLinearElasticLaw::FinalizeMaterialResponsePK2(ConstitutiveLaw
     FinalizeMaterialResponseCauchy(rValues);
 }
 
+Geo::LocalErrorData GeoIncrementalLinearElasticLaw::CalculateLocalErrorData(ConstitutiveLaw::Parameters& rParameters)
+{
+    auto result = BaseType::CalculateLocalErrorData(rParameters);
+
+    // The stress increment of an elastic stress point equals its elastic predictor, so its total
+    // and elastic strain energy increments coincide
+    result.TotalStrainEnergyIncrement =
+        inner_prod(mDeltaStrainVector, mStressVector - mStressVectorFinalized);
+    result.ElasticStrainEnergyIncrement = result.TotalStrainEnergyIncrement;
+    return result;
+}
+
 void GeoIncrementalLinearElasticLaw::ResetMaterial(const Properties&, const GeometryType&, const Vector&)
 {
     mStressVector          = ZeroVector(mStressVector.size());

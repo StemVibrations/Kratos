@@ -479,22 +479,20 @@ private:
         for (auto& r_element : r_elements) {
             LocalSystemVectorType local_body_force = LocalSystemVectorType(0);
 
-            // set displacement temporarily to zero to prevent the calculation of the internal forces
-            auto& r_geometry = r_element.GetGeometry();
-            std::vector<array_1d<double, 3>> current_displacements = std::vector<array_1d<double, 3>>();
-            std::vector<array_1d<double, 3>> current_rotations = std::vector<array_1d<double, 3>>();
-            for (std::size_t i = 0; i < r_geometry.size(); ++i) {
-                bool has_rotation_dofs = r_geometry[i].HasDofFor(ROTATION_Z);
-
-                current_displacements.push_back(r_geometry[i].FastGetSolutionStepValue(DISPLACEMENT));
-                if (has_rotation_dofs)
-                    current_rotations.push_back(r_geometry[i].FastGetSolutionStepValue(ROTATION));
-                r_geometry[i].FastGetSolutionStepValue(DISPLACEMENT) = ZeroVector(3);
-                if (has_rotation_dofs)
-                    r_geometry[i].FastGetSolutionStepValue(ROTATION) = ZeroVector(3);
-            }
-
             if (r_element.IsActive()) {
+                // set the displacement and rotation dofs of the element temporarily to zero to prevent
+                // the calculation of the internal forces. Note that the dofs are not necessarily
+                // located at the nodes of the element geometry (e.g. for embedded elements).
+                Element::DofsVectorType element_dofs;
+                r_element.GetDofList(element_dofs, r_current_process_info);
+                std::vector<std::pair<Dof<double>*, double>> current_dof_values;
+                for (auto* p_dof : element_dofs) {
+                    if (IsDisplacementOrRotationDof(*p_dof)) {
+                        current_dof_values.emplace_back(p_dof, p_dof->GetSolutionStepValue());
+                        p_dof->GetSolutionStepValue() = 0.0;
+                    }
+                }
+
                 // reset the constitutive law, such that historic strains and stresses are reset
                 std::vector<ConstitutiveLaw::Pointer> constitutive_law_vector;
                 r_element.CalculateOnIntegrationPoints(CONSTITUTIVE_LAW, constitutive_law_vector,
@@ -514,16 +512,21 @@ private:
 
                 // assemble the elemental contribution
                 BaseType::AssembleRHS(mConstantElementForceVector, local_body_force, equation_ids);
-            }
-            std::vector<array_1d<double, 3>>::iterator rotations_it = current_rotations.begin();
 
-            // reset displacement and rotation to original values
-            for (std::size_t i = 0; i < r_geometry.size(); ++i) {
-                r_geometry[i].FastGetSolutionStepValue(DISPLACEMENT) = current_displacements[i];
-                if (r_geometry[i].HasDofFor(ROTATION_Z))
-                    r_geometry[i].FastGetSolutionStepValue(ROTATION) = *rotations_it++;
+                // reset the displacement and rotation dofs to their original values (in reverse order,
+                // such that dofs that appear more than once get their original value back)
+                for (auto it = current_dof_values.rbegin(); it != current_dof_values.rend(); ++it) {
+                    it->first->GetSolutionStepValue() = it->second;
+                }
             }
         };
+    }
+
+    static bool IsDisplacementOrRotationDof(const Dof<double>& rDof)
+    {
+        const auto& r_variable = rDof.GetVariable();
+        return r_variable == DISPLACEMENT_X || r_variable == DISPLACEMENT_Y || r_variable == DISPLACEMENT_Z ||
+               r_variable == ROTATION_X || r_variable == ROTATION_Y || r_variable == ROTATION_Z;
     }
 
     void BuildRHSNoDirichlet(typename TSchemeType::Pointer pScheme, ModelPart& rModelPart, TSystemVectorType& rb)
@@ -677,7 +680,7 @@ private:
         }
 
         Geo::SparseSystemUtilities::SetUFirstAndSecondDerivativeVector(
-            first_derivative_vector, second_derivative_vector, rModelPart);
+            first_derivative_vector, second_derivative_vector, r_dof_set, rModelPart);
     }
 
     void InitializeDynamicMatrix(TSystemMatrixType&            rMatrix,
