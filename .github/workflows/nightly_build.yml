@@ -42,11 +42,16 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
+    # The ubuntu-22.04 container only ships Python 3.10, Kratos requires >= 3.12
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+
     - name: CI configuration
       shell: bash
       run: |
         python3 kratos/python_scripts/testing/ci_utilities.py
-        python3 -m pip install parameterized
+        python3 -m pip install scipy sympy parameterized
         python3 -m pip install --upgrade numpy==1.26.4
         python3 -m pip install orjson==3.11.3
 
