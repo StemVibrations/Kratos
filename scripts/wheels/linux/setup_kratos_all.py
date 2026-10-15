@@ -31,8 +31,6 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: C++",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: 3.14",
@@ -47,5 +45,5 @@ setuptools.setup(
         "Development Status :: 5 - Production/Stable",
         "Environment :: Console"
     ],
-    python_requires='>=3.10, <3.15',
+    python_requires='>=3.12, <3.15',
 )

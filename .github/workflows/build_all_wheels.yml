@@ -33,7 +33,7 @@ jobs:
       KRATOS_VERSION: ${{ steps.set_version.outputs.KRATOS_VERSION }}
     steps:
       - id: set_version
-        run: echo "KRATOS_VERSION=10.4.0.3" >> $GITHUB_OUTPUT
+        run: echo "KRATOS_VERSION=10.4.0.4" >> $GITHUB_OUTPUT
 
 
   windows:
@@ -43,7 +43,7 @@ jobs:
       - setup
     strategy:
       matrix:
-        python-version: [ '3.10', '3.11', '3.12']
+        python-version: [ '3.12', '3.13', '3.14' ]
     env:
       KRATOS_BUILD_TYPE: Custom
       KRATOS_CI_CHANGED_FILES: ${{needs.changed-files.outputs.files}}
@@ -98,7 +98,7 @@ jobs:
       - setup
     strategy:
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13', '3.14' ]
+        python-version: [ '3.12', '3.13', '3.14' ]
     env:
       KRATOS_VERSION: ${{ needs.setup.outputs.KRATOS_VERSION }}
       KRATOS_BUILD_TYPE: Custom

@@ -60,18 +60,6 @@ RUN mkdir /workspace/med; \
     rm -r /workspace/med/build
 
 # Install setuptools
-# 3.8
-RUN /opt/python/cp38-cp38/bin/python -m pip install --upgrade pip
-RUN /opt/python/cp38-cp38/bin/python -m pip install --upgrade setuptools wheel mypy toml build hatchling
-# 3.9
-RUN /opt/python/cp39-cp39/bin/python -m pip install --upgrade pip
-RUN /opt/python/cp39-cp39/bin/python -m pip install --upgrade setuptools wheel mypy toml build hatchling 
-# 3.10
-RUN /opt/python/cp310-cp310/bin/python -m pip install --upgrade pip
-RUN /opt/python/cp310-cp310/bin/python -m pip install --upgrade setuptools wheel mypy toml build hatchling
-# 3.11
-RUN /opt/python/cp311-cp311/bin/python -m pip install --upgrade pip
-RUN /opt/python/cp311-cp311/bin/python -m pip install --upgrade setuptools wheel mypy toml build hatchling
 # 3.12
 RUN /opt/python/cp312-cp312/bin/python -m pip install --upgrade pip
 RUN /opt/python/cp312-cp312/bin/python -m pip install --upgrade setuptools wheel mypy toml build hatchling

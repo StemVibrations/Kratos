@@ -19,7 +19,7 @@ title = "KratosMultiphysics Core"
     authors = [
         {name="Kratos Team", email="kratosmultiphysics@gmail.com"}
     ]
-    requires-python = ">=3.8"
+    requires-python = ">=3.12"
     dependencies = [
         "numpy>=1.20"
     ]

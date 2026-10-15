@@ -8,8 +8,8 @@ def set_install_requirements():
     """
     Creates kratos requirements list
     """
-    release_tag = "release1.3.3"
-    kratos_version = "10.4.0.3"
+    release_tag = "release1.3.4"
+    kratos_version = "10.4.0.4"
     python_version_part = ""
     platform_part = ""
 
@@ -26,11 +26,7 @@ def set_install_requirements():
     kratos_geo_mechanics_application = "stemkratosgeomechanicsapplication"
     kratos_railway_application = "stemkratosrailwayapplication"
 
-    if (platform.python_version().startswith("3.10.")):
-        python_version_part = '-cp310-cp310'
-    elif (platform.python_version().startswith("3.11.")):
-        python_version_part = '-cp311-cp311'
-    elif (platform.python_version().startswith("3.12.")):
+    if (platform.python_version().startswith("3.12.")):
         python_version_part = '-cp312-cp312'
     elif (platform.python_version().startswith("3.13.")):
         python_version_part = '-cp313-cp313'
