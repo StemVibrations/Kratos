@@ -55,10 +55,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    # The ubuntu-22.04 container only ships Python 3.10, Kratos requires >= 3.12
-    - uses: actions/setup-python@v5
+    # The ubuntu-22.04 container only ships Python 3.10, Kratos requires >= 3.12.
+    # actions/setup-python cannot be used here: its binaries are built for the host runner
+    # (ubuntu-24.04, glibc 2.38) and fail inside the 22.04 container (glibc 2.35).
+    # uv provides portable python-build-standalone interpreters instead.
+    - uses: astral-sh/setup-uv@v6
       with:
-        python-version: '3.12'
+        enable-cache: false
+
+    - name: Set up Python 3.12
+      shell: bash
+      run: |
+        uv venv --python 3.12 --seed "${RUNNER_TEMP}/py312"
+        echo "${RUNNER_TEMP}/py312/bin" >> "${GITHUB_PATH}"
+        "${RUNNER_TEMP}/py312/bin/python3" --version
 
     # - name: Installing dependencies
     # => must be added to the docker container to avoid reinstalling it in every CI run
