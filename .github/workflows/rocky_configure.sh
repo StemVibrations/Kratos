@@ -60,7 +60,7 @@ echo "Kratos build type is ${KRATOS_BUILD_TYPE}"
 cmake -H"${KRATOS_SOURCE}" -B"${KRATOS_BUILD}/${KRATOS_BUILD_TYPE}"             \
 ${KRATOS_CMAKE_OPTIONS_FLAGS}                                                   \
 -DUSE_MPI=OFF                                                                   \
--DPYBIND11_PYTHON_VERSION="3.8"                                                 \
+-DPYBIND11_PYTHON_VERSION="3.12"                                                 \
 -DBOOST_ROOT="${BOOST_ROOT}"                                                    \
 -DCMAKE_CXX_FLAGS="${KRATOS_CMAKE_CXX_FLAGS} -O0 -Wall -Wno-overloaded-virtual" \
 -DCMAKE_UNITY_BUILD=ON                                                          \

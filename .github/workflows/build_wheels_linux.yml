@@ -33,7 +33,7 @@ jobs:
     needs: changed-files
     strategy:
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.12']
     env:
       KRATOS_BUILD_TYPE: Custom
       KRATOS_CI_CHANGED_FILES: ${{needs.changed-files.outputs.files}}

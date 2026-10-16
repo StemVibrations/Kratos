@@ -55,6 +55,21 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    # The ubuntu-22.04 container only ships Python 3.10, Kratos requires >= 3.12.
+    # actions/setup-python cannot be used here: its binaries are built for the host runner
+    # (ubuntu-24.04, glibc 2.38) and fail inside the 22.04 container (glibc 2.35).
+    # uv provides portable python-build-standalone interpreters instead.
+    - uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: false
+
+    - name: Set up Python 3.12
+      shell: bash
+      run: |
+        uv venv --python 3.12 --seed "${RUNNER_TEMP}/py312"
+        echo "${RUNNER_TEMP}/py312/bin" >> "${GITHUB_PATH}"
+        "${RUNNER_TEMP}/py312/bin/python3" --version
+
     # - name: Installing dependencies
     # => must be added to the docker container to avoid reinstalling it in every CI run
 
@@ -62,8 +77,8 @@ jobs:
       shell: bash
       run: |
         python3 kratos/python_scripts/testing/ci_utilities.py
-        python3 -m pip install --upgrade numpy==1.26.4
-        python3 -m pip install --upgrade orjson==3.11.3
+        # Pinned versions provide wheels for Python 3.12, 3.13 and 3.14
+        python3 -m pip install --upgrade numpy==2.5.4 scipy==1.18.1 sympy==1.14.0 parameterized==0.9.0 orjson==3.11.3
 
     - name: Build
       shell: bash
@@ -230,11 +245,8 @@ jobs:
     - name: Installing dependencies
       shell: cmd
       run: |
-        pip install numpy
-        pip install sympy
-        pip install h5py
-        pip install parameterized
-        pip install orjson==3.11.3
+        rem Pinned versions provide wheels for Python 3.12, 3.13 and 3.14
+        pip install numpy==2.5.4 sympy==1.14.0 h5py==3.16.0 parameterized==0.9.0 orjson==3.11.3
 
     - name: Build
       shell: cmd

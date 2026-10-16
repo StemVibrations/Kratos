@@ -52,7 +52,7 @@ Expected output:
  . \  |   (   | |   (   |\__ \
 _|\_\_|  \__,_|\__|\___/ ____/
            Multi-Physics 9.4."3"-docs/expression_documentation-156476ea1c-Release-x86_64
-           Compiled for GNU/Linux and Python3.11 with GCC-13.2
+           Compiled for GNU/Linux and Python3.12 with GCC-13.2
 Compiled with threading and MPI support.
 Maximum number of threads: 30.
 Running without MPI.
@@ -99,7 +99,7 @@ Expected output:
  . \  |   (   | |   (   |\__ \
 _|\_\_|  \__,_|\__|\___/ ____/
            Multi-Physics 9.4."3"-docs/expression_documentation-156476ea1c-Release-x86_64
-           Compiled for GNU/Linux and Python3.11 with GCC-13.2
+           Compiled for GNU/Linux and Python3.12 with GCC-13.2
 Compiled with threading and MPI support.
 Maximum number of threads: 30.
 Running without MPI.
@@ -150,7 +150,7 @@ Expected output:
  . \  |   (   | |   (   |\__ \
 _|\_\_|  \__,_|\__|\___/ ____/
            Multi-Physics 9.4."3"-docs/expression_documentation-156476ea1c-Release-x86_64
-           Compiled for GNU/Linux and Python3.11 with GCC-13.2
+           Compiled for GNU/Linux and Python3.12 with GCC-13.2
 Compiled with threading and MPI support.
 Maximum number of threads: 30.
 Running without MPI.
@@ -193,7 +193,7 @@ Expected output:
  . \  |   (   | |   (   |\__ \
 _|\_\_|  \__,_|\__|\___/ ____/
            Multi-Physics 9.4."3"-docs/expression_documentation-156476ea1c-Release-x86_64
-           Compiled for GNU/Linux and Python3.11 with GCC-13.2
+           Compiled for GNU/Linux and Python3.12 with GCC-13.2
 Compiled with threading and MPI support.
 Maximum number of threads: 30.
 Running without MPI.
