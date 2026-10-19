@@ -51,7 +51,7 @@ Expected output:
  . \  |   (   | |   (   |\__ \  
 _|\_\_|  \__,_|\__|\___/ ____/
            Multi-Physics 9.4."3"-docs/add_python_processing_locally-eb00abccc7-FullDebug-x86_64
-           Compiled for GNU/Linux and Python3.11 with GCC-13.2
+           Compiled for GNU/Linux and Python3.12 with GCC-13.2
 Compiled with threading and MPI support.
 Maximum number of threads: 30.
 Running without MPI.

@@ -57,7 +57,11 @@ build_application_wheel () {
 
     $PYTHON_LOCATION setup.py bdist_wheel
 
-    auditwheel repair dist/*.whl
+    # Kratos libraries (libKratosCore.so, lib<App>Core.so, ...) are provided by the core/dependency wheels,
+    # which all install into KratosMultiphysics/.libs. They must not be grafted (renamed with a hash) into
+    # the application wheel, otherwise a second copy of e.g. KratosCore gets loaded at runtime (with its own
+    # Registry), which crashes on exit with "Trying to remove inexistent component".
+    auditwheel repair --exclude "libKratos*.so" dist/*.whl
 
     optimize_wheel
 
@@ -178,7 +182,12 @@ build_interface () {
 
 PYTHON_LOCATION=$(which python$PYTHON_VERSION)
 
-$PYTHON_LOCATION -m pip install setuptools wheel auditwheel
+$PYTHON_LOCATION -m pip install setuptools wheel "auditwheel>=6.2.0" "patchelf>=0.14.5"
+# Make sure the pip-installed patchelf (in the python bin dir) takes precedence over the system one
+export PATH="$(dirname "$PYTHON_LOCATION"):$PATH"
+hash -r
+echo "Using patchelf: $(which patchelf) ($(patchelf --version))"
+
 
 echo "Starting core build"
 build_core $PYTHON_LOCATION ${KRATOS_ROOT}/bin/core

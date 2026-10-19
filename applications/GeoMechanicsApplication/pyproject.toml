@@ -16,7 +16,7 @@
     authors = [
         {name="Kratos Team", email="kratos@deltares.nl"}
     ]
-    requires-python = ">=3.8"
+    requires-python = ">=3.12"
     dependencies = [
         "KratosMultiphysics=={env:KRATOS_VERSION}",
         "KratosLinearSolversApplication=={env:KRATOS_VERSION}",

@@ -28,7 +28,7 @@ export KRATOS_INSTALL_PYTHON_USING_LINKS=ON
 # Set basic configuration
 export KRATOS_BUILD_TYPE=${KRATOS_BUILD_TYPE:-"Release"}
 export BOOST_ROOT=${BOOST_ROOT:-"/path/to/boost"}
-export PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE:-"/Library/Frameworks/Python.framework/Versions/3.7/bin/python3"}
+export PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE:-"/Library/Frameworks/Python.framework/Versions/3.12/bin/python3"}
 
 # Set applications to compile
 export KRATOS_APPLICATIONS=

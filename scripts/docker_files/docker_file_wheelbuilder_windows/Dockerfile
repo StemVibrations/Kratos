@@ -45,46 +45,6 @@ RUN powershell.exe -Command \
     mkdir c:\boost; \
     7z x c:\TEMP\boost.zip -o"c:\boost"
 
-#Install python 3.8
-RUN powershell.exe -Command \
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    wget https://www.python.org/ftp/python/3.8.2/python-3.8.2-amd64.exe -OutFile c:\temp\python38.exe; \
-    mkdir c:\python\38; \
-    Start-Process c:\temp\python38.exe -ArgumentList '/quiet InstallAllUsers=1 PrependPath=0 TargetDir=c:\\python\\38' -Wait; \
-    c:\python\38\python.exe -m pip install --upgrade pip; \
-    c:\python\38\python.exe -m pip install mypy toml build hatchling; \
-    c:\python\38\python.exe -m pip install --upgrade setuptools wheel 
-
-#Install python 3.9
-RUN powershell.exe -Command \
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    wget https://www.python.org/ftp/python/3.9.0/python-3.9.0-amd64.exe -OutFile c:\temp\python39.exe; \
-    mkdir c:\python\39; \
-    Start-Process c:\temp\python39.exe -ArgumentList '/quiet InstallAllUsers=1 PrependPath=0 TargetDir=c:\\python\\39' -Wait; \
-    c:\python\39\python.exe -m pip install --upgrade pip; \
-    c:\python\39\python.exe -m pip install mypy toml build hatchling; \
-    c:\python\39\python.exe -m pip install --upgrade setuptools wheel
-
-#Install python 3.10
-RUN powershell.exe -Command \
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    wget https://www.python.org/ftp/python/3.10.0/python-3.10.0-amd64.exe -OutFile c:\temp\python310.exe; \
-    mkdir c:\python\310; \
-    Start-Process c:\temp\python310.exe -ArgumentList '/quiet InstallAllUsers=1 PrependPath=0 TargetDir=c:\\python\\310' -Wait; \
-    c:\python\310\python.exe -m pip install --upgrade pip; \
-    c:\python\310\python.exe -m pip install mypy toml build hatchling; \
-    c:\python\310\python.exe -m pip install --upgrade setuptools wheel
-
-#Install python 3.11
-RUN powershell.exe -Command \
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    wget https://www.python.org/ftp/python/3.11.0/python-3.11.0-amd64.exe -OutFile c:\temp\python311.exe; \
-    mkdir c:\python\311; \
-    Start-Process c:\temp\python311.exe -ArgumentList '/quiet InstallAllUsers=1 PrependPath=0 TargetDir=c:\\python\\311' -Wait; \
-    c:\python\311\python.exe -m pip install --upgrade pip; \
-    c:\python\311\python.exe -m pip install mypy toml build hatchling; \
-    c:\python\311\python.exe -m pip install --upgrade setuptools wheel
-
 #Install python 3.12
 RUN powershell.exe -Command \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
