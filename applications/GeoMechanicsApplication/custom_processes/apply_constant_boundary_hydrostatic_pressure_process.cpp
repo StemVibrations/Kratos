@@ -11,6 +11,7 @@
 //
 
 #include "apply_constant_boundary_hydrostatic_pressure_process.h"
+#include <cmath>
 #include "geo_mechanics_application_variables.h"
 #include "includes/kratos_flags.h"
 #include "includes/model_part.h"
@@ -80,7 +81,7 @@ void ApplyConstantBoundaryHydrostaticPressureProcess::ExecuteInitialize()
         Vector edge = r_geometry[1].Coordinates() - r_geometry[0].Coordinates();
 
 		bool is_edge_vertical = false;
-        if (abs(edge[0]) < 1e-12)
+        if (std::abs(edge[0]) < 1e-12)
         {
 			is_edge_vertical = true;
         }
