@@ -125,7 +125,7 @@ void ApplyConstantBoundaryHydrostaticPressureProcess::ExecuteInitialize()
         }
         else
         {
-			if (water_to_element[0] * normal_vector[0])
+			if (water_to_element[0] * normal_vector[0] > 0.0)
 			{
 				sign = -1.0;
 			}
